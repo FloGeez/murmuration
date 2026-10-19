@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>murmuration — demo</title>
+<style>
+:root { --bg: #F6F5F2; --surface: #ECEAE5; --text: #1F1E24; --muted: #5E5C6B; --line: #D6D3CC; --accent: #1F1E24; }
+body { margin: 0; min-height: 100vh; background: var(--bg); color: var(--text); font: 16px/1.5 system-ui, sans-serif; }
+main { display: grid; grid-template-columns: minmax(0, 320px) minmax(0, 640px); gap: 48px; align-items: center; min-height: 100vh; padding: 32px; box-sizing: border-box; max-width: 1100px; margin: 0 auto; }
+h1 { font-size: 44px; line-height: 1; letter-spacing: -.03em; margin: 0 0 12px; }
+p { color: var(--muted); margin: 0 0 24px; }
+code { font-size: 14px; }
+nav { display: flex; flex-direction: column; gap: 8px; }
+button { font: inherit; font-weight: 600; text-align: left; min-height: 44px; padding: 0 16px; border-radius: 10px; border: 1.5px solid var(--line); background: transparent; color: var(--text); cursor: pointer; }
+button[aria-pressed=true] { background: #fff; border-color: var(--accent); }
+button:focus-visible { outline: 3px solid var(--muted); outline-offset: 3px; }
+#sky { width: 100%; aspect-ratio: 9 / 8; border-radius: 16px; background: var(--surface); display: block; }
+@media (max-width: 760px) { main { grid-template-columns: 1fr; } }
+</style></head>
+<body>
+<main>
+  <div>
+    <h1>murmuration</h1>
+    <p>A flock that draws shapes: a tight outline, a sparse inside. The birds shy away from the pointer. Here the flock lives inside a canvas (<code>frame: 'canvas'</code>); by default it goes along the whole page.</p>
+    <nav id="nav"></nav>
+  </div>
+  <canvas id="sky" aria-label="A flock of birds drawing the chosen shape"></canvas>
+</main>
+<!-- Open through a small local server (npx serve . at the repository root): ES modules do not load over file:// -->
+<script type="module">
+import { createMurmuration, sampleShape, fitShape, solid, hollow } from '../index.js';
+
+// three plain shapes on the 720 × 640 frame
+const ring = (g) => { solid(g); g.beginPath(); g.arc(360, 320, 260, 0, 6.2832); g.fill(); hollow(g); g.beginPath(); g.arc(360, 320, 150, 0, 6.2832); g.fill(); solid(g); };
+const heart = (g) => { solid(g); g.beginPath(); g.moveTo(360, 580); g.bezierCurveTo(120, 420, 70, 250, 160, 150); g.bezierCurveTo(240, 70, 330, 110, 360, 190); g.bezierCurveTo(390, 110, 480, 70, 560, 150); g.bezierCurveTo(650, 250, 600, 420, 360, 580); g.fill(); };
+const star = (g) => { solid(g); g.beginPath(); for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, r = i % 2 ? 120 : 290; g.lineTo(360 + Math.cos(a) * r, 330 + Math.sin(a) * r); } g.closePath(); g.fill(); hollow(g); g.beginPath(); g.arc(360, 330, 60, 0, 6.2832); g.fill(); solid(g); };
+
+const sky = document.getElementById('sky');
+const m = createMurmuration(sky, { frame: 'canvas', count: 320, colors: ['#2B2A33', '#2B2A33', '#5E5C6B'], debug: new URLSearchParams(location.search).has('debug') });
+const size = () => ({ width: sky.clientWidth, height: sky.clientHeight });
+const swarm = () => ({ x: sky.clientWidth / 2, y: 40, rx: sky.clientWidth * 0.3, ry: 20 });
+const land = (shape) => m.perch(fitShape(sampleShape(shape, 288), size()), { rest: 'circle', zone: swarm });
+const actions = [['Free flight', () => m.fly()], ['Ring', () => land(ring)], ['Heart', () => land(heart)], ['Star', () => land(star)], ['Shy ring', () => m.perch(fitShape(sampleShape(ring, 288), size()), { rest: 'leave', shy: true })], ['Scatter', () => m.scatter()]];
+const nav = document.getElementById('nav');
+actions.forEach(([label, run], i) => {
+  const b = document.createElement('button'); b.type = 'button'; b.textContent = label; b.setAttribute('aria-pressed', i === 0);
+  b.onclick = () => { nav.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', x === b)); run(); };
+  nav.append(b);
+});
+</script>
+</body></html>
