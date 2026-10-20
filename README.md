@@ -2,7 +2,7 @@
 
 A flock of birds that draws shapes. The birds land on a list of points, settle tight on a shape's outline and sparse inside it, circle a zone above it, shy away from the pointer, and follow the page section by section. One canvas, plain ES modules, no build, no dependency.
 
-It is the engine behind the starlings of [florian-etourneau.dev](https://florian-etourneau.dev). Birds are only the default: give it a fish, a leaf or a dot and it becomes a school, a gust or a swarm of fireflies. **[Try the demo](https://flogeez.github.io/murmuration/demo/)**: type a word, change the glyph.
+It is the engine behind the starlings of [florian-etourneau.dev](https://florian-etourneau.dev). Birds are only the default: give it a fish, a leaf or a dot and it becomes a school, a gust or a swarm of fireflies. **[Try the demo](https://flogeez.github.io/murmuration/demo/)**: type a word, change the glyph, tune the flock and copy the code.
 
 ```sh
 npm i @flogeez/murmuration
@@ -21,7 +21,37 @@ m.perch(fitShape(sampleShape(ring, 288), { width: canvas.clientWidth, height: ca
 });
 ```
 
-`m.fly()` lets the flock fly freely, `m.scatter()` sends it away, `m.setColors(colors)` and `m.setGlyph(glyph)` restyle it, `m.destroy()` cleans up.
+`m.fly()` lets the flock fly freely, `m.scatter()` sends it away, `m.setColors(colors)` and `m.setGlyph(glyph)` restyle it, `m.setCount(n)` adds or removes birds (perch again to share the places out), `m.destroy()` stops it and removes its listeners.
+
+A glyph is any SVG path facing right. Birds, fish and leaves work, and so does plain geometry: a dot, a square, or a triangle that travels nose first, the classic way of drawing boids.
+
+```js
+const TRIANGLE = { path: 'M20 10 L0 2 L4 10 L0 18 Z', anchor: [8, 10], scale: 0.55, flight: 'glyph' };
+m.setGlyph(TRIANGLE);
+```
+
+## With a framework
+
+The engine owns a canvas and nothing else, so any framework only has to create it after mounting and destroy it on unmount.
+
+```jsx
+// React
+function Flock({ shape }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const canvas = ref.current, m = createMurmuration(canvas, { frame: 'canvas' });
+    m.perch(fitShape(sampleShape(shape, 240), { width: canvas.clientWidth, height: canvas.clientHeight }));
+    return () => m.destroy();
+  }, [shape]);
+  return <canvas ref={ref} style={{ width: '100%', aspectRatio: '9 / 8' }} />;
+}
+```
+
+```js
+// Vue
+onMounted(() => { m = createMurmuration(canvas.value, { frame: 'canvas' }); });
+onUnmounted(() => m.destroy());
+```
 
 ## Options
 

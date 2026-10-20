@@ -4,7 +4,7 @@
 <style>
 :root { --bg: #F6F5F2; --surface: #ECEAE5; --text: #1F1E24; --muted: #5E5C6B; --line: #D6D3CC; --accent: #1F1E24; }
 body { margin: 0; min-height: 100vh; background: var(--bg); color: var(--text); font: 16px/1.5 system-ui, sans-serif; }
-main { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 640px); gap: 48px; align-items: center; min-height: 100vh; padding: 32px; box-sizing: border-box; max-width: 1100px; margin: 0 auto; }
+main { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 640px); gap: 48px; align-items: start; min-height: 100vh; padding: max(32px, 12vh) 32px 32px; box-sizing: border-box; max-width: 1100px; margin: 0 auto; }
 h1 { font-size: 44px; line-height: 1; letter-spacing: -.03em; margin: 0 0 12px; }
 p { color: var(--muted); margin: 0 0 24px; }
 code { font-size: 14px; }
@@ -15,8 +15,16 @@ nav { display: flex; flex-wrap: wrap; gap: 8px; }
 button { font: inherit; font-weight: 600; min-height: 44px; padding: 0 16px; border-radius: 10px; border: 1.5px solid var(--line); background: transparent; color: var(--text); cursor: pointer; }
 button[aria-pressed=true] { background: #fff; border-color: var(--accent); }
 button:focus-visible { outline: 3px solid var(--muted); outline-offset: 3px; }
-#sky { width: 100%; aspect-ratio: 9 / 8; border-radius: 16px; background: var(--surface); display: block; }
-@media (max-width: 760px) { main { grid-template-columns: 1fr; gap: 24px; padding: 16px; } #sky { order: -1; } }
+details { margin-top: 24px; border-top: 1.5px solid var(--line); padding-top: 16px; }
+summary { font-weight: 600; cursor: pointer; min-height: 32px; }
+summary:focus-visible { outline: 3px solid var(--muted); outline-offset: 3px; border-radius: 4px; }
+.setting { display: grid; grid-template-columns: 1fr auto; gap: 0 12px; margin-top: 12px; color: var(--muted); font-size: 14px; }
+.setting input { grid-column: 1 / -1; min-height: 32px; padding: 0; border: 0; background: none; accent-color: var(--accent); }
+.setting output { font-variant-numeric: tabular-nums; color: var(--text); font-weight: 600; }
+pre { position: relative; margin: 16px 0 0; padding: 14px 16px; border-radius: 10px; background: #fff; border: 1.5px solid var(--line); overflow-x: auto; font-size: 12.5px; line-height: 1.55; }
+#copy { position: absolute; top: 6px; right: 6px; min-height: 32px; padding: 0 10px; font-size: 13px; background: var(--bg); }
+#sky { width: 100%; aspect-ratio: 9 / 8; border-radius: 16px; background: var(--surface); display: block; position: sticky; top: 32px; }
+@media (max-width: 760px) { main { grid-template-columns: 1fr; gap: 24px; padding: 16px; } #sky { order: -1; position: static; } }
 </style></head>
 <body>
 <main>
@@ -29,6 +37,13 @@ button:focus-visible { outline: 3px solid var(--muted); outline-offset: 3px; }
     <nav id="glyphs" aria-label="Glyph"></nav>
     <h2>Shapes</h2>
     <nav id="shapes" aria-label="Shapes"></nav>
+    <details>
+      <summary>More options</summary>
+      <label class="setting"><span>How many</span><output id="count-value"></output><input id="count" type="range" min="100" max="600" step="20" value="320"></label>
+      <label class="setting"><span>Glyph size</span><output id="scale-value"></output><input id="scale" type="range" min="50" max="200" step="10" value="100"></label>
+      <label class="setting"><span>Places on the shape</span><output id="density-value"></output><input id="density" type="range" min="50" max="150" step="10" value="100"></label>
+      <pre><button id="copy" type="button">Copy</button><code id="code"></code></pre>
+    </details>
   </div>
   <canvas id="sky" aria-label="A flock drawing the chosen word or shape"></canvas>
 </main>
@@ -51,21 +66,28 @@ const word = (g) => {
 };
 word.key = text;
 
-// the glyphs: an SVG path facing right, the point that sits on its place, its scale; the fish and the leaf travel as themselves
+// the glyphs: an SVG path facing right, the point that sits on its place, its scale; all but the bird travel as themselves.
+// Living ones first, then plain geometry: the triangle is the classic way of drawing boids.
 const glyphs = [
   ['Bird', PLAIN_BIRD, ['#2B2A33', '#2B2A33', '#5E5C6B']],
   ['Fish', { path: 'M86 30 C76 16 54 12 36 22 L14 10 L20 30 L14 50 L36 38 C54 48 76 44 86 30 Z', anchor: [50, 30], scale: 0.16, flight: 'glyph' }, ['#164A6E', '#1F5E8C', '#2E7FB5']],
-  ['Firefly', { path: 'M10 0 A10 10 0 1 1 10 20 A10 10 0 1 1 10 0 Z', anchor: [10, 10], scale: 0.3, flight: 'glyph' }, ['#B97A06', '#D99512', '#8A5A00']],
   ['Leaf', { path: 'M4 30 C24 8 62 4 92 30 C62 56 24 52 4 30 Z', anchor: [48, 30], scale: 0.15, flight: 'glyph' }, ['#3F7A3A', '#5E8F2E', '#A8692A']],
+  ['Dot', { path: 'M10 0 A10 10 0 1 1 10 20 A10 10 0 1 1 10 0 Z', anchor: [10, 10], scale: 0.3, flight: 'glyph' }, ['#1F1E24', '#5E5C6B']],
+  ['Triangle', { path: 'M20 10 L0 2 L4 10 L0 18 Z', anchor: [8, 10], scale: 0.55, flight: 'glyph' }, ['#B4441C', '#D9622B', '#8C3412']],
+  ['Square', { path: 'M0 0 H10 V10 H0 Z', anchor: [5, 5], scale: 0.6, flight: 'glyph' }, ['#3B3F9E', '#5A5FC8', '#2A2D73']],
 ];
 
 const sky = document.getElementById('sky');
-const m = createMurmuration(sky, { frame: 'canvas', count: 320, colors: glyphs[0][2], debug: new URLSearchParams(location.search).has('debug') });
+const settings = { count: 320, scale: 1, density: 1, glyph: 0 };
+const m = createMurmuration(sky, { frame: 'canvas', count: settings.count, colors: glyphs[0][2], debug: new URLSearchParams(location.search).has('debug') });
 const size = () => ({ width: sky.clientWidth, height: sky.clientHeight });
 const swarm = () => ({ x: sky.clientWidth / 2, y: 40, rx: sky.clientWidth * 0.3, ry: 20 });
 // fewer places on a small sky, so that the glyphs do not overlap
-const places = () => Math.round(Math.min(288, sky.clientWidth * 0.45));
+const places = () => Math.min(settings.count, Math.round(Math.min(288, sky.clientWidth * 0.45) * settings.density));
 const land = (shape) => m.perch(fitShape(sampleShape(shape, places()), size()), { rest: 'circle', zone: swarm, keep: 48, shy: true });
+// what the flock is doing, to do it again when a setting changes
+let current = () => m.fly();
+const run = (action) => { current = action; action(); showCode(); };
 
 // a group of buttons where one is pressed; select(null) releases them all
 const group = (nav, items, run) => {
@@ -78,16 +100,59 @@ const group = (nav, items, run) => {
   return select;
 };
 
-const selectGlyph = group(document.getElementById('glyphs'), glyphs, (glyph, colors) => { m.setGlyph(glyph); m.setColors(colors); });
-selectGlyph(0);
+const glyph = () => { const g = glyphs[settings.glyph][1]; return settings.scale === 1 ? g : { ...g, scale: +(g.scale * settings.scale).toFixed(3) }; };
+const selectGlyph = group(document.getElementById('glyphs'), glyphs.map(([label], i) => [label, i]), (i) => {
+  settings.glyph = i; m.setGlyph(glyph()); m.setColors(glyphs[i][2]); showCode();
+});
 
 const selectShape = group(document.getElementById('shapes'), [
   ['Free flight', () => m.fly()], ['Ring', () => land(ring)], ['Heart', () => land(heart)], ['Star', () => land(star)], ['Scatter', () => m.scatter()],
-], (run) => run());
+], run);
+
+// more options: each slider changes the flock at once, and lands it again once the hand pauses
+let settle = 0;
+const slider = (id, format, apply) => {
+  const el = document.getElementById(id), out = document.getElementById(id + '-value');
+  out.textContent = format(+el.value);
+  el.addEventListener('input', () => {
+    out.textContent = format(+el.value); apply(+el.value); showCode();
+    clearTimeout(settle); settle = setTimeout(current, 250);
+  });
+};
+slider('count', (v) => v, (v) => { settings.count = v; m.setCount(v); });
+slider('scale', (v) => v + ' %', (v) => { settings.scale = v / 100; m.setGlyph(glyph()); });
+slider('density', (v) => v + ' %', (v) => { settings.density = v / 100; });
+
+// the code that gives this flock, ready to copy
+const code = document.getElementById('code');
+function showCode() {
+  const [label, g, colors] = glyphs[settings.glyph];
+  const custom = label !== 'Bird' || settings.scale !== 1;
+  const glyphCode = label === 'Bird' ? `{ ...PLAIN_BIRD, scale: ${glyph().scale} }`
+    : `{ path: '${g.path}', anchor: [${g.anchor.join(', ')}], scale: ${glyph().scale}, flight: 'glyph' }`;
+  code.textContent = `import { createMurmuration, ${custom && label === 'Bird' ? 'PLAIN_BIRD, ' : ''}sampleShape, fitShape } from '@flogeez/murmuration';
+
+const m = createMurmuration(canvas, {
+  frame: 'canvas',
+  count: ${settings.count},
+  colors: [${colors.map((c) => `'${c}'`).join(', ')}],${custom ? `\n  glyph: ${glyphCode},` : ''}
+});
+// shape: (g) => { … }, drawn on a 720 × 640 canvas
+m.perch(fitShape(sampleShape(shape, ${places()}), { width: canvas.clientWidth, height: canvas.clientHeight }), {
+  rest: 'circle', keep: 48, shy: true,
+  zone: () => ({ x: canvas.clientWidth / 2, y: 40, rx: canvas.clientWidth * 0.3, ry: 20 }),
+});`;
+}
+const copy = document.getElementById('copy');
+copy.onclick = async () => {
+  try { await navigator.clipboard.writeText(code.textContent); copy.textContent = 'Copied'; } catch { copy.textContent = 'Select and copy'; }
+  setTimeout(() => { copy.textContent = 'Copy'; }, 1500);
+};
+selectGlyph(0);
 
 // typing re-lands the flock on the word, once the hand pauses; an empty field lets it fly
 let pause = 0;
-const writeWord = () => { selectShape(null); if (text()) land(word); else m.fly(); };
+const writeWord = () => { selectShape(null); run(() => (text() ? land(word) : m.fly())); };
 input.addEventListener('input', () => { clearTimeout(pause); pause = setTimeout(writeWord, 300); });
 input.addEventListener('focus', () => { if (text()) writeWord(); });
 writeWord();
