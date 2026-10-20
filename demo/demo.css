@@ -9,7 +9,7 @@
      medium: a panel; long: what is rare). What leaves goes in about two thirds of the time of what arrives. */
   --dur-flash: 130ms; --dur-short: 250ms; --dur-medium: 450ms; --dur-long: 650ms;
   /* ease-out for what enters, leaves or answers; ease-in-out for what moves across the screen; the drawer curve for the panel */
-  --ease-out: cubic-bezier(.23, 1, .32, 1); --ease-in-out: cubic-bezier(.77, 0, .175, 1); --ease-drawer: cubic-bezier(.32, .72, 0, 1); --ease-overshoot: cubic-bezier(.3, 1.6, .5, 1);
+  --ease-out: cubic-bezier(.2, .8, .2, 1); --ease-in-out: cubic-bezier(.65, 0, .35, 1); --ease-drawer: cubic-bezier(.32, .72, 0, 1); --ease-overshoot: cubic-bezier(.3, 1.6, .5, 1);
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
