@@ -76,6 +76,7 @@ h2 { margin: 0 0 16px; font: 750 clamp(30px, 4.2vw, 52px)/1.02 var(--font); font
 .end { position: relative; z-index: 1; padding: 120px max(24px, 6vw) 200px; text-align: center; }
 .end h2 { font-size: clamp(26px, 3.4vw, 40px); }
 .end p { color: var(--muted); }
+.heart { width: 1em; height: 1em; vertical-align: -.15em; fill: var(--t-kw); stroke: none; }
 .install { display: inline-flex; align-items: center; gap: 8px; margin: 8px 0 24px; padding: 6px 6px 6px 18px; border-radius: 12px; background: var(--panel); border: 1px solid var(--line); }
 .install code { font-size: 15px; }
 
@@ -97,7 +98,7 @@ h2 { margin: 0 0 16px; font: 750 clamp(30px, 4.2vw, 52px)/1.02 var(--font); font
 #settings-toggle { margin-left: 2px; }
 /* the code panel open: the toolbar stays centred on the sky that is left */
 .toolbar { transition: left calc(var(--dur-medium) * .66) var(--ease-drawer); }
-.code-open .toolbar { left: calc((100vw - min(460px, 100vw)) / 2); transition-duration: var(--dur-medium); }
+
 
 .settings { position: absolute; right: 0; bottom: calc(100% + 10px); width: 280px; padding: 8px 16px 16px; border-radius: 16px; background: var(--solid); border: 1px solid var(--line); box-shadow: 0 16px 40px -16px rgba(10, 20, 30, .4);
   /* it grows from its trigger, bottom right; a transition, not keyframes, so that a quick second click reverses it */
@@ -111,8 +112,10 @@ h2 { margin: 0 0 16px; font: 750 clamp(30px, 4.2vw, 52px)/1.02 var(--font); font
 /* ——— Code panel: slides in from the right ——— */
 .code-panel { position: fixed; top: 0; right: 0; bottom: 0; z-index: 4; display: flex; flex-direction: column; width: min(460px, 100vw); padding: 16px 16px 24px 24px; background: var(--solid); border-left: 1px solid var(--line); transform: translateX(100%); transition: transform calc(var(--dur-medium) * .66) var(--ease-drawer); }
 .code-panel.open { transform: none; transition-duration: var(--dur-medium); }
-/* the panel opens beside the page and pushes it, rather than covering the shapes */
-@media (min-width: 861px) {
+/* the panel opens beside the page and pushes it, rather than covering the shapes, when both fit side by side;
+   on a narrower window, it covers the page */
+@media (min-width: 1280px) {
+  .code-open .toolbar { left: calc((100vw - 460px) / 2); transition-duration: var(--dur-medium); }
   main { transition: margin-right calc(var(--dur-medium) * .66) var(--ease-drawer); }
   .top { transition: right calc(var(--dur-medium) * .66) var(--ease-drawer); }
   .code-open main { margin-right: min(460px, 100vw); transition-duration: var(--dur-medium); }
@@ -153,6 +156,9 @@ h2 { margin: 0 0 16px; font: 750 clamp(30px, 4.2vw, 52px)/1.02 var(--font); font
   transform-origin: 50% 100%; opacity: 0; transform: translate(-50%, calc(-100% - 6px)) scale(.97);
   transition: opacity 90ms var(--ease-out), transform 90ms var(--ease-out); }
 .tip.on { opacity: 1; transform: translate(-50%, calc(-100% - 8px)); transition-duration: 125ms; }
+/* no room above (the top bar): below its control, growing from the top */
+.tip.below { transform-origin: 50% 0; transform: translate(-50%, 6px) scale(.97); }
+.tip.below.on { transform: translate(-50%, 8px); }
 .tip.instant { transition-duration: 0ms; }
 /* reduced motion: fewer and gentler, not nothing. Colours and fades stay; moves, scales and drawings go. */
 @media (prefers-reduced-motion: reduce) {

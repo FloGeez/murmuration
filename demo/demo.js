@@ -70,7 +70,8 @@ const m = createMurmuration($('flock'), { frame: 'page', count: state.count, gly
 /* ——— Geometry: boxes in document coordinates ——— */
 const stage = $('stage');
 const docBox = (el) => { const r = el.getBoundingClientRect(); return { left: r.left + scrollX, top: r.top + scrollY, width: r.width, height: r.height }; };
-const panelWidth = () => (state.codeOpen && innerWidth > 860 ? Math.min(460, innerWidth) : 0);
+// the panel pushes the page when the page and the toolbar still fit beside it (demo.css), otherwise it covers it
+const panelWidth = () => (state.codeOpen && innerWidth >= 1280 ? 460 : 0);
 // the stage's shape sits between the top bar and the toolbar, left of the code panel when it is open
 // (measured from the window, not from the stage: the stage is still shrinking while the panel slides in)
 const stageBox = () => {
@@ -341,7 +342,13 @@ const tip = document.createElement('div');
 tip.className = 'tip'; tip.setAttribute('aria-hidden', 'true'); // the controls already carry the same name (aria-label)
 document.body.append(tip);
 let tipWait = 0, tipCool = 0, warm = false, tipFor = null;
-const placeTip = (el) => { const r = el.getBoundingClientRect(); tip.style.left = `${r.left + r.width / 2}px`; tip.style.top = `${r.top}px`; };
+// above its control, or below when there is no room above; always inside the window, 8 px from its edges
+const placeTip = (el) => {
+  const r = el.getBoundingClientRect(), half = tip.offsetWidth / 2, below = r.top < tip.offsetHeight + 16;
+  tip.classList.toggle('below', below);
+  tip.style.left = `${Math.min(innerWidth - 8 - half, Math.max(8 + half, r.left + r.width / 2))}px`;
+  tip.style.top = `${below ? r.bottom : r.top}px`;
+};
 function showTip(el, instant) {
   tipFor = el; tip.textContent = el.dataset.tip; placeTip(el);
   tip.classList.toggle('instant', instant); tip.classList.add('on'); warm = true; clearTimeout(tipCool);
