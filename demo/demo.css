@@ -5,10 +5,11 @@
   --panel: rgba(246, 248, 250, .88); --solid: #F6F8FA; --lamp: #F3CF63;
   --t-kw: #6A3B95; --t-str: #2E6A36; --t-num: #9A4510; --t-com: #74838F;
   --font: 'Archivo', system-ui, sans-serif; --mono: ui-monospace, 'Cascadia Code', 'SF Mono', Menlo, monospace;
-  /* motion: the same durations and curves everywhere (flash: hover and press; short: a control changes state;
+  /* motion: the same durations and curves everywhere (flash: hover, press, tooltip; short: a control changes state, a popover;
      medium: a panel; long: what is rare). What leaves goes in about two thirds of the time of what arrives. */
   --dur-flash: 130ms; --dur-short: 250ms; --dur-medium: 450ms; --dur-long: 650ms;
-  --ease-out: cubic-bezier(.2, .8, .2, 1); --ease-overshoot: cubic-bezier(.3, 1.6, .5, 1); --ease-in-out: cubic-bezier(.65, 0, .35, 1);
+  /* ease-out for what enters, leaves or answers; ease-in-out for what moves across the screen; the drawer curve for the panel */
+  --ease-out: cubic-bezier(.23, 1, .32, 1); --ease-in-out: cubic-bezier(.77, 0, .175, 1); --ease-drawer: cubic-bezier(.32, .72, 0, 1); --ease-overshoot: cubic-bezier(.3, 1.6, .5, 1);
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
@@ -18,7 +19,9 @@
 }
 
 * { box-sizing: border-box; }
-html { background: var(--sky); }
+html { background: var(--sky); -webkit-tap-highlight-color: transparent; -webkit-text-size-adjust: 100%; }
+/* controls: no double-tap zoom delay, no text selection on a long press */
+button, a, [role="radio"] { touch-action: manipulation; -webkit-user-select: none; user-select: none; }
 body { margin: 0; color: var(--ink); font: 400 16px/1.55 var(--font); background: linear-gradient(var(--sky) 0, var(--sky) 60vh, var(--horizon) 100vh, var(--sky) 160vh) no-repeat; transition: background-color .4s; }
 a { color: inherit; text-underline-offset: 3px; }
 code { font: 13px/1.6 var(--mono); font-variant-ligatures: none; }
@@ -41,7 +44,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 /* every control answers: background on hover (mouse only), pressed in on press */
 .ghost, .code-toggle, .tool { transition: background-color var(--dur-flash) var(--ease-out), color var(--dur-flash) var(--ease-out), transform var(--dur-short) var(--ease-out); }
 .ghost:active, .code-toggle:active, .tool:active { transform: scale(.96); transition-duration: var(--dur-flash); }
-@media (hover: hover) {
+@media (hover: hover) and (pointer: fine) {
   .ghost:hover { background: var(--line); }
   .code-toggle:not([aria-expanded="true"]):hover { background: color-mix(in srgb, var(--ink) 86%, var(--sky)); }
   .tool:not([aria-checked="true"]):not([aria-expanded="true"]):hover { background: var(--line); color: var(--ink); }
@@ -77,7 +80,7 @@ h2 { margin: 0 0 16px; font: 750 clamp(30px, 4.2vw, 52px)/1.02 var(--font); font
 .install code { font-size: 15px; }
 
 /* ——— Toolbar: floating, the controls of the flock ——— */
-.toolbar { position: fixed; left: 50%; bottom: 20px; z-index: 3; transform: translateX(-50%); display: flex; align-items: center; gap: 6px; padding: 6px; border-radius: 16px; background: var(--panel); border: 1px solid var(--line); box-shadow: 0 12px 32px -12px rgba(10, 20, 30, .35); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); max-width: calc(100vw - 24px); }
+.toolbar { position: fixed; left: 50%; bottom: max(20px, env(safe-area-inset-bottom)); z-index: 3; transform: translateX(-50%); display: flex; align-items: center; gap: 6px; padding: 6px; border-radius: 16px; background: var(--panel); border: 1px solid var(--line); box-shadow: 0 12px 32px -12px rgba(10, 20, 30, .35); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); max-width: calc(100vw - 24px); }
 .word input { width: 168px; min-height: 44px; padding: 0 14px; border: 0; border-radius: 11px; background: var(--line); color: var(--ink); font: 650 16px var(--font); font-stretch: 112%; }
 .word input::placeholder { color: var(--muted); font-weight: 400; }
 .word input:focus-visible { outline-offset: 0; }
@@ -87,30 +90,31 @@ h2 { margin: 0 0 16px; font: 750 clamp(30px, 4.2vw, 52px)/1.02 var(--font); font
 .tool[aria-expanded="true"] { background: var(--ink); }
 .tool svg.glyph { fill: currentColor; stroke: none; }
 /* the pill slides under the chosen tool */
-.pill { position: absolute; top: 0; left: 0; width: 44px; height: 44px; border-radius: 11px; background: var(--ink); opacity: 0; transition: transform var(--dur-short) var(--ease-out), opacity var(--dur-flash) var(--ease-out); }
+.pill { position: absolute; top: 0; left: 0; width: 44px; height: 44px; border-radius: 11px; background: var(--ink); opacity: 0; transition: transform var(--dur-short) var(--ease-in-out), opacity var(--dur-flash) var(--ease-out); }
 .pill.on { opacity: 1; }
 /* a keyboard action is never animated */
 .pill.instant, .instant, .instant * { transition: none !important; animation: none !important; }
 #settings-toggle { margin-left: 2px; }
 /* the code panel open: the toolbar stays centred on the sky that is left */
-.toolbar { transition: left calc(var(--dur-medium) * .66) var(--ease-out); }
+.toolbar { transition: left calc(var(--dur-medium) * .66) var(--ease-drawer); }
 .code-open .toolbar { left: calc((100vw - min(460px, 100vw)) / 2); transition-duration: var(--dur-medium); }
 
-.settings { position: absolute; right: 0; bottom: calc(100% + 10px); width: 280px; padding: 8px 16px 16px; border-radius: 16px; background: var(--solid); border: 1px solid var(--line); box-shadow: 0 16px 40px -16px rgba(10, 20, 30, .4); transform-origin: bottom right; animation: rise var(--dur-short) var(--ease-out); }
-.settings.closing { animation: sink calc(var(--dur-short) * .66) var(--ease-out) forwards; }
-@keyframes rise { from { opacity: 0; transform: translateY(6px) scale(.98); } }
-@keyframes sink { to { opacity: 0; transform: translateY(6px) scale(.98); } }
+.settings { position: absolute; right: 0; bottom: calc(100% + 10px); width: 280px; padding: 8px 16px 16px; border-radius: 16px; background: var(--solid); border: 1px solid var(--line); box-shadow: 0 16px 40px -16px rgba(10, 20, 30, .4);
+  /* it grows from its trigger, bottom right; a transition, not keyframes, so that a quick second click reverses it */
+  transform-origin: calc(100% - 22px) calc(100% + 32px); opacity: 0; transform: scale(.96); visibility: hidden;
+  transition: opacity 140ms var(--ease-out), transform 140ms var(--ease-out), visibility 0s 140ms; }
+.settings.open { opacity: 1; transform: none; visibility: visible; transition: opacity 200ms var(--ease-out), transform 200ms var(--ease-out), visibility 0s; }
 .setting { display: grid; grid-template-columns: 1fr auto; gap: 0 12px; margin-top: 12px; color: var(--muted); font-size: 14px; }
 .setting output { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
 .setting input { grid-column: 1 / -1; width: 100%; margin: 6px 0 0; accent-color: var(--ink); }
 
 /* ——— Code panel: slides in from the right ——— */
-.code-panel { position: fixed; top: 0; right: 0; bottom: 0; z-index: 4; display: flex; flex-direction: column; width: min(460px, 100vw); padding: 16px 16px 24px 24px; background: var(--solid); border-left: 1px solid var(--line); transform: translateX(100%); transition: transform calc(var(--dur-medium) * .66) var(--ease-out); }
+.code-panel { position: fixed; top: 0; right: 0; bottom: 0; z-index: 4; display: flex; flex-direction: column; width: min(460px, 100vw); padding: 16px 16px 24px 24px; background: var(--solid); border-left: 1px solid var(--line); transform: translateX(100%); transition: transform calc(var(--dur-medium) * .66) var(--ease-drawer); }
 .code-panel.open { transform: none; transition-duration: var(--dur-medium); }
 /* the panel opens beside the page and pushes it, rather than covering the shapes */
 @media (min-width: 861px) {
-  main { transition: margin-right calc(var(--dur-medium) * .66) var(--ease-out); }
-  .top { transition: right calc(var(--dur-medium) * .66) var(--ease-out); }
+  main { transition: margin-right calc(var(--dur-medium) * .66) var(--ease-drawer); }
+  .top { transition: right calc(var(--dur-medium) * .66) var(--ease-drawer); }
   .code-open main { margin-right: min(460px, 100vw); transition-duration: var(--dur-medium); }
   .code-open .top { right: min(460px, 100vw); transition-duration: var(--dur-medium); }
 }
@@ -140,8 +144,19 @@ h2 { margin: 0 0 16px; font: 750 clamp(30px, 4.2vw, 52px)/1.02 var(--font); font
   .code-open .toolbar { left: 12px; }
   .tool { width: 40px; } .pill { width: 40px; }
   .hint { bottom: 200px; }
-  .settings { left: 0; right: 0; width: auto; }
+  .settings { left: 0; right: 0; width: auto; transform-origin: calc(100% - 40px) calc(100% + 32px); }
+  .toolbar { bottom: max(12px, env(safe-area-inset-bottom)); }
 }
+
+/* ——— Tooltips: a short delay on the first, then instant while moving along the toolbar ——— */
+.tip { position: fixed; z-index: 6; left: 0; top: 0; padding: 5px 9px; border-radius: 7px; background: var(--ink); color: var(--sky); font: 500 13px/1.3 var(--font); white-space: nowrap; pointer-events: none;
+  transform-origin: 50% 100%; opacity: 0; transform: translate(-50%, calc(-100% - 6px)) scale(.97);
+  transition: opacity 90ms var(--ease-out), transform 90ms var(--ease-out); }
+.tip.on { opacity: 1; transform: translate(-50%, calc(-100% - 8px)); transition-duration: 125ms; }
+.tip.instant { transition-duration: 0ms; }
+/* reduced motion: fewer and gentler, not nothing. Colours and fades stay; moves, scales and drawings go. */
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { transition-duration: 0s !important; animation-duration: 0s !important; }
+  *, *::before, *::after { transition-property: opacity, color, background-color, border-color, visibility !important; }
+  .check-draw { animation: none; stroke-dashoffset: 0; }
+  .tool:active, .ghost:active, .code-toggle:active { transform: none; }
 }

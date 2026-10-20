@@ -102,12 +102,14 @@ const lineShape = (pts, box) => {
   const back = (frame) => frame.map(([x, y]) => [(x - ox) / k - box.left, (y - oy) / k - box.top]);
   return { draw, back, path, width: Math.round(26 * k) };
 };
+let strokeId = null;
 stage.addEventListener('pointerdown', (e) => {
-  if (e.button !== 0 || (e.pointerType === 'touch' && state.action !== 'draw')) return;
-  stroke = [[e.pageX, e.pageY]]; stage.setPointerCapture(e.pointerId); sizeInk(); ink.style.transition = 'none'; ink.style.opacity = 1; dismissHint();
+  // one finger draws: a second one, once the line has started, is ignored
+  if (stroke || e.button !== 0 || (e.pointerType === 'touch' && state.action !== 'draw')) return;
+  strokeId = e.pointerId; stroke = [[e.pageX, e.pageY]]; stage.setPointerCapture(e.pointerId); sizeInk(); ink.style.transition = 'none'; ink.style.opacity = 1; dismissHint();
 });
 stage.addEventListener('pointermove', (e) => {
-  if (!stroke) return;
+  if (!stroke || e.pointerId !== strokeId) return;
   const [px, py] = stroke[stroke.length - 1];
   if (Math.hypot(e.pageX - px, e.pageY - py) < 4) return;
   stroke.push([e.pageX, e.pageY]);
@@ -115,8 +117,8 @@ stage.addEventListener('pointermove', (e) => {
   pen.strokeStyle = getComputedStyle(root).getPropertyValue('--muted'); pen.lineWidth = 2; pen.lineCap = 'round';
   pen.beginPath(); pen.moveTo(px - r.left - scrollX, py - r.top - scrollY); pen.lineTo(e.pageX - r.left - scrollX, e.pageY - r.top - scrollY); pen.stroke();
 });
-const endStroke = () => {
-  if (!stroke) return;
+const endStroke = (e) => {
+  if (!stroke || e.pointerId !== strokeId) return;
   const pts = stroke; stroke = null;
   ink.style.transition = 'opacity 1.2s'; ink.style.opacity = 0;
   const length = pts.slice(1).reduce((s, p, i) => s + Math.hypot(p[0] - pts[i][0], p[1] - pts[i][1]), 0);
@@ -170,7 +172,7 @@ function radioGroup(el, items, label, onPick) {
   const pill = el.querySelector('.pill');
   const buttons = items.map((item, i) => {
     const b = document.createElement('button');
-    b.type = 'button'; b.className = 'tool'; b.setAttribute('role', 'radio'); b.setAttribute('aria-label', label(item)); b.title = label(item);
+    b.type = 'button'; b.className = 'tool'; b.setAttribute('role', 'radio'); b.setAttribute('aria-label', label(item)); b.dataset.tip = label(item);
     b.innerHTML = item.svg;
     b.onclick = () => onPick(i);
     b.onkeydown = (e) => {
@@ -208,7 +210,7 @@ input.addEventListener('input', () => {
   clearTimeout(pause); pause = setTimeout(() => { if (!text()) return choose('fly'); choose('word'); say(`The flock writes ${text()}.`); }, 260);
 });
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') { instantly(); if (closeSettings(false) || closeCode()) return; choose('fly'); return; }
+  if (e.key === 'Escape') { instantly(); if (closeSettings() || closeCode()) return; choose('fly'); return; }
   const t = e.target;
   if (e.ctrlKey || e.metaKey || e.altKey || e.key.length !== 1 || t === input || t.closest('input, textarea, .code-panel')) return;
   if (t.closest('button, a') && (e.key === ' ' || e.key === 'Enter')) return;
@@ -217,15 +219,10 @@ document.addEventListener('keydown', (e) => {
 
 // settings: a popover over the toolbar
 const settings = $('settings'), settingsToggle = $('settings-toggle');
-// it leaves faster than it came (.closing), except from the keyboard
-const closeSettings = (animated = true) => {
-  if (settings.hidden || settings.classList.contains('closing')) return false;
-  settingsToggle.setAttribute('aria-expanded', false);
-  const hide = () => { settings.hidden = true; settings.classList.remove('closing'); };
-  if (!animated || reducedMotion()) hide(); else { settings.classList.add('closing'); settings.addEventListener('animationend', hide, { once: true }); }
-  return true;
-};
-settingsToggle.onclick = () => { if (!settings.hidden) return closeSettings(); settings.hidden = false; settingsToggle.setAttribute('aria-expanded', true); };
+// a class and transitions (demo.css): it leaves faster than it came, and a quick second click reverses it midway
+const openSettings = (open) => { settings.classList.toggle('open', open); settings.inert = !open; settingsToggle.setAttribute('aria-expanded', open); };
+const closeSettings = () => { if (!settings.classList.contains('open')) return false; openSettings(false); return true; };
+settingsToggle.onclick = () => { if (!closeSettings()) openSettings(true); };
 document.addEventListener('pointerdown', (e) => { if (!e.target.closest('.settings, #settings-toggle')) closeSettings(); });
 let settle = 0;
 const slider = (id, format, apply) => {
@@ -242,7 +239,7 @@ slider('density', (v) => `${v} %`, (v) => { state.density = v / 100; });
 
 /* ——— Theme ——— */
 const themeButton = $('theme');
-const showTheme = () => themeButton.setAttribute('aria-label', theme() === 'dark' ? 'Switch to light theme' : 'Switch to dark theme');
+const showTheme = () => { themeButton.setAttribute('aria-label', theme() === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'); themeButton.dataset.tip = theme() === 'dark' ? 'Light theme' : 'Dark theme'; };
 themeButton.onclick = () => { root.dataset.theme = theme() === 'dark' ? 'light' : 'dark'; store.set('theme', theme()); showTheme(); m.setColors(colorsNow()); showCode(); };
 showTheme();
 
@@ -307,6 +304,8 @@ const copyButton = (button, textOf, target, then = () => {}) => {
   const show = (s) => {
     clearTimeout(timer);
     button.dataset.state = s; label.textContent = COPY_LABEL[s]; say(COPY_SAID[s]);
+    // a light blur bridges the old word and the new one, so they read as one change
+    if (!reducedMotion()) label.animate([{ filter: 'blur(2px)', opacity: 0.6 }, { filter: 'none', opacity: 1 }], { duration: 200, easing: EASE.out });
     button.querySelector('svg').outerHTML = s === 'idle' ? icon : '<svg class="check-draw" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 12.5 9.5 17.5 19.5 6.5" pathLength="1"/></svg>';
     if (s === 'idle') return;
     if (!reducedMotion()) button.animate([{ transform: 'scale(.94)' }, { transform: 'none' }], { duration: 500, easing: EASE.overshoot });
@@ -323,6 +322,33 @@ const cheer = () => {
 };
 copyButton($('copy-code'), () => code.textContent, code, cheer);
 document.querySelectorAll('[data-copy]').forEach((b) => copyButton(b, () => b.dataset.copy, b.previousElementSibling));
+
+/* ——— Tooltips: the first one waits 500 ms (no accidental opening), the next ones open at once, without animation,
+   as long as the pointer moves from one control to the next. From the keyboard, at once. ——— */
+const tip = document.createElement('div');
+tip.className = 'tip'; tip.setAttribute('aria-hidden', 'true'); // the controls already carry the same name (aria-label)
+document.body.append(tip);
+let tipWait = 0, tipCool = 0, warm = false, tipFor = null;
+const placeTip = (el) => { const r = el.getBoundingClientRect(); tip.style.left = `${r.left + r.width / 2}px`; tip.style.top = `${r.top}px`; };
+function showTip(el, instant) {
+  tipFor = el; tip.textContent = el.dataset.tip; placeTip(el);
+  tip.classList.toggle('instant', instant); tip.classList.add('on'); warm = true; clearTimeout(tipCool);
+}
+function hideTip() {
+  clearTimeout(tipWait); if (!tipFor) return;
+  tipFor = null; tip.classList.remove('on');
+  tipCool = setTimeout(() => { warm = false; }, 300); // a short gap between two controls keeps the toolbar warm
+}
+document.addEventListener('pointerover', (e) => {
+  const el = e.target.closest('[data-tip]');
+  if (e.pointerType !== 'mouse' || !el || el === tipFor) return;
+  clearTimeout(tipWait);
+  if (warm) showTip(el, true); else tipWait = setTimeout(() => showTip(el, false), 500);
+});
+document.addEventListener('pointerout', (e) => { const el = e.target.closest('[data-tip]'); if (el && !el.contains(e.relatedTarget)) hideTip(); });
+document.addEventListener('pointerdown', hideTip, true); // pressing hides it: the action speaks
+document.addEventListener('focusin', (e) => { const el = e.target.closest('[data-tip]'); if (el && el.matches(':focus-visible')) showTip(el, true); });
+document.addEventListener('focusout', hideTip);
 
 /* ——— Hint and announcements ——— */
 const hint = $('hint'), status = $('status');
