@@ -1,0 +1,121 @@
+/* murmuration demo — an evening sky: pearl grey by day, blue at nightfall. One accent, a street-lamp yellow, only for what just changed. */
+:root {
+  color-scheme: light;
+  --sky: #E4E9ED; --horizon: #CAD4DC; --ink: #16202A; --muted: #55636F; --line: rgba(22, 32, 42, .14);
+  --panel: rgba(246, 248, 250, .88); --solid: #F6F8FA; --lamp: #F3CF63;
+  --t-kw: #6A3B95; --t-str: #2E6A36; --t-num: #9A4510; --t-com: #74838F;
+  --font: 'Archivo', system-ui, sans-serif; --mono: ui-monospace, 'Cascadia Code', 'SF Mono', Menlo, monospace;
+  --ease: cubic-bezier(.2, .7, .2, 1);
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --sky: #131A25; --horizon: #222D3F; --ink: #E6ECF1; --muted: #93A1AD; --line: rgba(230, 236, 241, .14);
+  --panel: rgba(24, 32, 45, .9); --solid: #1A2331; --lamp: #8A6A12;
+  --t-kw: #C9A6F0; --t-str: #A6D99A; --t-num: #F2B27A; --t-com: #7F8E9B;
+}
+
+* { box-sizing: border-box; }
+html { background: var(--sky); }
+body { margin: 0; color: var(--ink); font: 400 16px/1.55 var(--font); background: linear-gradient(var(--sky) 0, var(--sky) 60vh, var(--horizon) 100vh, var(--sky) 160vh) no-repeat; transition: background-color .4s; }
+a { color: inherit; text-underline-offset: 3px; }
+code { font: 13px/1.6 var(--mono); }
+:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+#flock { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+main, .top, .toolbar, .code-panel { position: relative; z-index: 1; }
+
+/* ——— Top bar ——— */
+.top { position: fixed; z-index: 2; inset: 0 0 auto; background: linear-gradient(var(--sky) 55%, transparent); display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 24px; }
+.package { font: 500 13px var(--mono); color: var(--muted); }
+.top-actions { display: flex; align-items: center; gap: 4px; }
+button { font: inherit; color: inherit; cursor: pointer; }
+.ghost { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 12px; border: 0; border-radius: 10px; background: none; color: var(--ink); font-weight: 500; text-decoration: none; }
+.ghost:hover { background: var(--line); }
+.ghost.icon { width: 40px; justify-content: center; padding: 0; }
+.code-toggle { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 16px 0 12px; border: 0; border-radius: 10px; background: var(--ink); color: var(--sky); font-weight: 600; }
+.code-toggle[aria-expanded="true"] { background: var(--line); color: var(--ink); }
+
+/* ——— Stage: the first screen, the flock is the title ——— */
+.stage { position: relative; height: 100svh; min-height: 520px; touch-action: pan-y; cursor: crosshair; }
+.stage.drawing { touch-action: none; }
+.ink { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.hint { position: absolute; left: 0; right: 0; bottom: 132px; margin: 0; text-align: center; color: var(--muted); font-size: 15px; transition: opacity .6s var(--ease); }
+.hint.gone { opacity: 0; }
+
+/* ——— Scenes: the engine explained while the flock follows the page ——— */
+.scene { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); align-items: center; gap: 48px; min-height: 100svh; padding: 96px max(24px, 6vw); }
+.perch { position: relative; height: min(60svh, 520px); }
+.wire { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.wire path { stroke: var(--muted); stroke-width: 1.5; vector-effect: non-scaling-stroke; fill: none; }
+.copy { max-width: 34rem; }
+h2 { margin: 0 0 16px; font: 750 clamp(30px, 4.2vw, 52px)/1.02 var(--font); font-stretch: 125%; letter-spacing: -.01em; }
+.copy p { margin: 0 0 24px; color: var(--muted); font-size: 18px; max-width: 32em; }
+.copy p code, .end code { color: var(--ink); }
+.copy pre { margin: 0; padding: 14px 16px; border-radius: 10px; background: var(--panel); border: 1px solid var(--line); overflow-x: auto; }
+
+.end { position: relative; z-index: 1; padding: 120px max(24px, 6vw) 200px; text-align: center; }
+.end h2 { font-size: clamp(26px, 3.4vw, 40px); }
+.end p { color: var(--muted); }
+.install { display: inline-flex; align-items: center; gap: 8px; margin: 8px 0 24px; padding: 6px 6px 6px 18px; border-radius: 12px; background: var(--panel); border: 1px solid var(--line); }
+.install code { font-size: 15px; }
+
+/* ——— Toolbar: floating, the controls of the flock ——— */
+.toolbar { position: fixed; left: 50%; bottom: 20px; z-index: 3; transform: translateX(-50%); display: flex; align-items: center; gap: 6px; padding: 6px; border-radius: 16px; background: var(--panel); border: 1px solid var(--line); box-shadow: 0 12px 32px -12px rgba(10, 20, 30, .35); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); max-width: calc(100vw - 24px); }
+.word input { width: 168px; min-height: 44px; padding: 0 14px; border: 0; border-radius: 11px; background: var(--line); color: var(--ink); font: 650 16px var(--font); font-stretch: 112%; }
+.word input::placeholder { color: var(--muted); font-weight: 400; }
+.word input:focus-visible { outline-offset: 0; }
+.group { position: relative; display: flex; gap: 2px; padding-left: 6px; margin-left: 2px; border-left: 1px solid var(--line); }
+.tool { position: relative; z-index: 1; display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 11px; background: none; color: var(--muted); transition: color .2s; }
+.tool:hover { color: var(--ink); }
+.tool[aria-checked="true"], .tool[aria-expanded="true"] { color: var(--sky); }
+.tool[aria-expanded="true"] { background: var(--ink); }
+.tool svg.glyph { fill: currentColor; stroke: none; }
+/* the pill slides under the chosen tool */
+.pill { position: absolute; top: 0; left: 0; width: 44px; height: 44px; border-radius: 11px; background: var(--ink); opacity: 0; transition: transform .28s var(--ease), opacity .2s; }
+.pill.on { opacity: 1; }
+#settings-toggle { margin-left: 2px; }
+/* the code panel open: the toolbar stays centred on the sky that is left */
+.code-open .toolbar { left: calc((100vw - min(460px, 100vw)) / 2); transition: left .38s var(--ease); }
+
+.settings { position: absolute; right: 0; bottom: calc(100% + 10px); width: 280px; padding: 8px 16px 16px; border-radius: 16px; background: var(--solid); border: 1px solid var(--line); box-shadow: 0 16px 40px -16px rgba(10, 20, 30, .4); transform-origin: bottom right; animation: rise .22s var(--ease); }
+@keyframes rise { from { opacity: 0; transform: translateY(6px) scale(.98); } }
+.setting { display: grid; grid-template-columns: 1fr auto; gap: 0 12px; margin-top: 12px; color: var(--muted); font-size: 14px; }
+.setting output { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+.setting input { grid-column: 1 / -1; width: 100%; margin: 6px 0 0; accent-color: var(--ink); }
+
+/* ——— Code panel: slides in from the right ——— */
+.code-panel { position: fixed; top: 0; right: 0; bottom: 0; z-index: 4; display: flex; flex-direction: column; width: min(460px, 100vw); padding: 16px 16px 24px 24px; background: var(--solid); border-left: 1px solid var(--line); transform: translateX(100%); transition: transform .38s var(--ease); }
+.code-panel.open { transform: none; box-shadow: -24px 0 48px -24px rgba(10, 20, 30, .35); }
+.code-head { display: flex; align-items: center; gap: 4px; margin-bottom: 8px; }
+.code-head h2 { flex: 1; margin: 0; font: 650 16px var(--font); font-stretch: 112%; }
+.code-panel pre { flex: 1; margin: 0; overflow: auto; font: 13px/1.65 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+.code-panel code { font-size: 12.5px; }
+.code-note { margin: 12px 0 0; color: var(--muted); font-size: 13px; }
+.t-kw { color: var(--t-kw); } .t-str { color: var(--t-str); } .t-num { color: var(--t-num); } .t-com { color: var(--t-com); font-style: italic; }
+.v { border-radius: 3px; }
+.v.lit { animation: lamp 1.4s var(--ease); }
+@keyframes lamp { 0%, 30% { background: var(--lamp); } 100% { background: transparent; } }
+
+/* ——— Small screens ——— */
+@media (max-width: 860px) {
+  .top { padding: 10px 12px; }
+  .package { display: none; }
+  .top { justify-content: flex-end; }
+  .scene { grid-template-columns: 1fr; gap: 24px; padding: 80px 20px; align-content: center; }
+  .perch { height: 44svh; }
+  .toolbar { left: 12px; right: 12px; bottom: 12px; transform: none; flex-wrap: wrap; justify-content: center; }
+  .word { flex: 1 1 100%; }
+  .word input { width: 100%; }
+  .group { border-left: 0; margin-left: 0; padding-left: 0; }
+  .scene { padding-bottom: 220px; }
+  .end { padding-bottom: 260px; }
+  .code-open .toolbar { left: 12px; }
+  .tool { width: 40px; } .pill { width: 40px; }
+  .hint { bottom: 200px; }
+  .settings { left: 0; right: 0; width: auto; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition-duration: 0s !important; animation-duration: 0s !important; }
+}

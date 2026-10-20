@@ -2,7 +2,7 @@
 
 A flock of birds that draws shapes. The birds land on a list of points, settle tight on a shape's outline and sparse inside it, circle a zone above it, shy away from the pointer, and follow the page section by section. One canvas, plain ES modules, no build, no dependency.
 
-It is the engine behind the starlings of [florian-etourneau.dev](https://florian-etourneau.dev). Birds are only the default: give it a fish, a leaf or a dot and it becomes a school, a gust or a swarm of fireflies. **[Try the demo](https://flogeez.github.io/murmuration/demo/)**: type a word, change the glyph, tune the flock and copy the code.
+It is the engine behind the starlings of [florian-etourneau.dev](https://florian-etourneau.dev). Birds are only the default: give it a fish, a leaf or a dot and it becomes a school, a gust or a swarm of fireflies. **[Try the demo](https://flogeez.github.io/murmuration/demo/)**: type a word, draw a line, change the glyph, tune the flock and copy the code.
 
 ```sh
 npm i @flogeez/murmuration
