@@ -4,6 +4,12 @@ import { createMurmuration, createScenes, PLAIN_BIRD, sampleShape, fitShape, sol
 
 const $ = (id) => document.getElementById(id);
 const root = document.documentElement;
+// motion: the durations and curves of demo.css, for the animations started from JS
+const DURATION = { flash: 130, short: 250, medium: 450, long: 650 };
+const EASE = { out: 'cubic-bezier(.2,.8,.2,1)', overshoot: 'cubic-bezier(.3,1.6,.5,1)', inOut: 'cubic-bezier(.65,0,.35,1)' };
+const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+// a keyboard action is never animated: transitions are cut for two frames
+const instantly = (el = document.body) => { el.classList.add('instant'); requestAnimationFrame(() => requestAnimationFrame(() => el.classList.remove('instant'))); };
 const store = { get: (k) => { try { return localStorage.getItem(k); } catch { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch { /* private mode */ } } };
 
 /* ——— Glyphs: an SVG path facing right, the point that sits on its place, its scale; all but the bird travel as themselves ——— */
@@ -50,8 +56,9 @@ const shapes = [
 ];
 
 /* ——— State ——— */
-const state = { glyph: 0, count: 320, scale: 1, density: 1, action: 'fly', line: null, lines: 0, codeOpen: false };
+const state = { glyph: 0, count: 320, scale: 1, density: 1, action: 'fly', line: null, lines: 0, codeOpen: false, cheer: false };
 let rev = 0; // bumped when the number of birds or places changes: every scene lands again
+let layout = 0; // bumped when the sections change width (the code panel pushes them): their scenes land again
 const theme = () => root.dataset.theme;
 root.dataset.theme = store.get('theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
 // smaller glyphs on a small screen, so that a word still reads
@@ -65,9 +72,10 @@ const stage = $('stage');
 const docBox = (el) => { const r = el.getBoundingClientRect(); return { left: r.left + scrollX, top: r.top + scrollY, width: r.width, height: r.height }; };
 const panelWidth = () => (state.codeOpen && innerWidth > 860 ? Math.min(460, innerWidth) : 0);
 // the stage's shape sits between the top bar and the toolbar, left of the code panel when it is open
+// (measured from the window, not from the stage: the stage is still shrinking while the panel slides in)
 const stageBox = () => {
   const b = docBox(stage), side = Math.max(24, innerWidth * 0.06), top = 88, bottom = innerWidth > 860 ? 170 : 240;
-  return { left: b.left + side, top: b.top + top, width: Math.max(120, b.width - side * 2 - panelWidth()), height: Math.max(120, b.height - top - bottom) };
+  return { left: side, top: b.top + top, width: Math.max(120, innerWidth - panelWidth() - side * 2), height: Math.max(120, b.height - top - bottom) };
 };
 // places grow with the area of the box: enough for a long word on a phone, not too many on a wide screen
 const places = (box) => Math.min(state.count, Math.round(Math.min(300, Math.sqrt(box.width * box.height) * 0.45) * state.density));
@@ -126,8 +134,11 @@ const perchOf = (name) => document.querySelector(`[data-scene="${name}"] [data-p
 const landed = (box, pts, options) => ({ points: pts, anchor: () => [box.left, box.top], ...options });
 const shapeIn = (el, draw, options) => { const box = docBox(el); return landed(box, fitShape(sampleShape(draw, places(box)), box), options); };
 
+// the signature moment: the code is copied, the flock draws a check mark, then goes back to its shape
+const check = (g) => { g.lineWidth = 96; g.lineCap = g.lineJoin = 'round'; g.beginPath(); g.moveTo(170, 350); g.lineTo(300, 480); g.lineTo(560, 180); g.stroke(); };
 function stagePose() {
   const box = stageBox(), rest = { rest: 'circle', zone: orbitAbove(box), keep: 60, shy: true };
+  if (state.cheer) return landed(box, fitBounds(sampleShape(check, places(box)), box, 1.4), rest);
   if (state.action === 'draw' && state.line) {
     const line = lineShape(state.line, box);
     return { points: line.back(sampleShape(line.draw, Math.min(state.count, Math.round(240 * state.density)), { key: 'line' + state.lines })), anchor: () => [box.left, box.top], ...rest };
@@ -144,10 +155,10 @@ function wirePose() {
   return landed(box, pts, { rest: 'circle', zone: () => ({ x: box.left + box.width / 2, y: box.top + box.height * 0.08, rx: box.width * 0.3, ry: 26 }) });
 }
 const scenes = createScenes(m, [
-  { name: 'stage', active: () => scrollY < innerHeight * 0.45 && state.action !== 'fly' && state.action !== 'scatter' && !(state.action === 'draw' && !state.line), variant: () => [state.action, text(), state.lines, rev, state.codeOpen].join('|'), pose: stagePose },
-  { name: 'wire', active: () => inView(sections[0]), variant: () => String(rev), pose: wirePose },
-  { name: 'scenes', active: () => inView(sections[1]), variant: () => String(rev), pose: () => shapeIn(perchOf('scenes'), braces, { rest: 'circle', zone: orbitAbove(docBox(perchOf('scenes'))), keep: 40 }) },
-  { name: 'shy', active: () => inView(sections[2]), variant: () => String(rev), pose: () => shapeIn(perchOf('shy'), ring, { rest: 'leave', shy: true }) },
+  { name: 'stage', active: () => scrollY < innerHeight * 0.45 && (state.cheer || (state.action !== 'fly' && state.action !== 'scatter' && !(state.action === 'draw' && !state.line))), variant: () => [state.cheer ? 'cheer' : state.action, text(), state.lines, rev, state.codeOpen].join('|'), pose: stagePose },
+  { name: 'wire', active: () => inView(sections[0]), variant: () => `${rev}|${layout}`, pose: wirePose },
+  { name: 'scenes', active: () => inView(sections[1]), variant: () => `${rev}|${layout}`, pose: () => shapeIn(perchOf('scenes'), braces, { rest: 'circle', zone: orbitAbove(docBox(perchOf('scenes'))), keep: 40 }) },
+  { name: 'shy', active: () => inView(sections[2]), variant: () => `${rev}|${layout}`, pose: () => shapeIn(perchOf('shy'), ring, { rest: 'leave', shy: true }) },
 ], { debug: new URLSearchParams(location.search).has('debug') });
 addEventListener('scroll', () => requestAnimationFrame(() => scenes.update()), { passive: true });
 let resizing = 0;
@@ -164,7 +175,7 @@ function radioGroup(el, items, label, onPick) {
     b.onclick = () => onPick(i);
     b.onkeydown = (e) => {
       const d = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0; if (!d) return;
-      e.preventDefault(); const n = buttons[(i + d + buttons.length) % buttons.length]; n.focus(); n.click();
+      e.preventDefault(); instantly(pill); const n = buttons[(i + d + buttons.length) % buttons.length]; n.focus(); n.click();
     };
     el.append(b); return b;
   });
@@ -184,7 +195,7 @@ function choose(action) {
   const i = shapes.findIndex((s) => s.action === action); pickShape(i < 0 ? null : i);
   stage.classList.toggle('drawing', action === 'draw');
   if (action === 'draw' && !state.line) say('Drag on the sky to draw a line.');
-  if (scrollY > innerHeight * 0.45 && action !== 'fly' && action !== 'scatter') scrollTo({ top: 0, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+  if (scrollY > innerHeight * 0.45 && action !== 'fly' && action !== 'scatter') scrollTo({ top: 0, behavior: reducedMotion() ? 'auto' : 'smooth' });
   scenes.update();
   if (action === 'scatter') m.scatter();
   showCode();
@@ -197,7 +208,7 @@ input.addEventListener('input', () => {
   clearTimeout(pause); pause = setTimeout(() => { if (!text()) return choose('fly'); choose('word'); say(`The flock writes ${text()}.`); }, 260);
 });
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') { if (closeSettings() || closeCode()) return; choose('fly'); return; }
+  if (e.key === 'Escape') { instantly(); if (closeSettings(false) || closeCode()) return; choose('fly'); return; }
   const t = e.target;
   if (e.ctrlKey || e.metaKey || e.altKey || e.key.length !== 1 || t === input || t.closest('input, textarea, .code-panel')) return;
   if (t.closest('button, a') && (e.key === ' ' || e.key === 'Enter')) return;
@@ -206,8 +217,15 @@ document.addEventListener('keydown', (e) => {
 
 // settings: a popover over the toolbar
 const settings = $('settings'), settingsToggle = $('settings-toggle');
-const closeSettings = () => { if (settings.hidden) return false; settings.hidden = true; settingsToggle.setAttribute('aria-expanded', false); return true; };
-settingsToggle.onclick = () => { const open = settings.hidden; settings.hidden = !open; settingsToggle.setAttribute('aria-expanded', open); };
+// it leaves faster than it came (.closing), except from the keyboard
+const closeSettings = (animated = true) => {
+  if (settings.hidden || settings.classList.contains('closing')) return false;
+  settingsToggle.setAttribute('aria-expanded', false);
+  const hide = () => { settings.hidden = true; settings.classList.remove('closing'); };
+  if (!animated || reducedMotion()) hide(); else { settings.classList.add('closing'); settings.addEventListener('animationend', hide, { once: true }); }
+  return true;
+};
+settingsToggle.onclick = () => { if (!settings.hidden) return closeSettings(); settings.hidden = false; settingsToggle.setAttribute('aria-expanded', true); };
 document.addEventListener('pointerdown', (e) => { if (!e.target.closest('.settings, #settings-toggle')) closeSettings(); });
 let settle = 0;
 const slider = (id, format, apply) => {
@@ -233,8 +251,10 @@ const panel = $('code-panel'), codeToggle = $('code-toggle'), code = $('code');
 const openCode = (open) => {
   state.codeOpen = open; panel.classList.toggle('open', open); document.body.classList.toggle('code-open', open); panel.inert = !open; codeToggle.setAttribute('aria-expanded', open);
   if (open) $('code-close').focus(); else codeToggle.focus();
-  scenes.update();
+  scenes.update(); showCode();
 };
+// the sections are narrower once the panel has pushed them: their shapes follow
+document.querySelector('main').addEventListener('transitionend', (e) => { if (e.propertyName === 'margin-right') { layout++; scenes.update(); } });
 const closeCode = () => { if (!state.codeOpen) return false; openCode(false); return true; };
 codeToggle.onclick = () => openCode(!state.codeOpen);
 $('code-close').onclick = () => openCode(false);
@@ -277,14 +297,32 @@ function showCode() {
   }
   before = now;
 }
-const copyButton = (button, textOf) => {
-  button.onclick = async () => {
-    try { await navigator.clipboard.writeText(textOf()); button.textContent = 'Copied'; } catch { button.textContent = 'Select and copy'; }
-    setTimeout(() => { button.textContent = 'Copy'; }, 1600);
+// Copy → Copied: the label changes, the check mark draws itself, the button bounces once, back to rest after 2.4 s.
+// Without a clipboard (outside HTTPS), the text is selected and the button says so. A screen reader hears it.
+const COPY_LABEL = { idle: 'Copy', copied: 'Copied', selected: 'Selected' };
+const COPY_SAID = { idle: '', copied: 'Copied to the clipboard', selected: 'Text selected, copy it with Ctrl+C' };
+const copyButton = (button, textOf, target, then = () => {}) => {
+  const icon = button.querySelector('svg').outerHTML, label = button.querySelector('span');
+  let timer = 0;
+  const show = (s) => {
+    clearTimeout(timer);
+    button.dataset.state = s; label.textContent = COPY_LABEL[s]; say(COPY_SAID[s]);
+    button.querySelector('svg').outerHTML = s === 'idle' ? icon : '<svg class="check-draw" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 12.5 9.5 17.5 19.5 6.5" pathLength="1"/></svg>';
+    if (s === 'idle') return;
+    if (!reducedMotion()) button.animate([{ transform: 'scale(.94)' }, { transform: 'none' }], { duration: 500, easing: EASE.overshoot });
+    timer = setTimeout(() => show('idle'), 2400);
   };
+  const select = () => { const r = document.createRange(); r.selectNodeContents(target); getSelection().removeAllRanges(); getSelection().addRange(r); show('selected'); };
+  button.onclick = () => { try { navigator.clipboard.writeText(textOf()).then(() => { show('copied'); then(); }, select); } catch { select(); } };
 };
-copyButton($('copy-code'), () => code.textContent);
-document.querySelectorAll('[data-copy]').forEach((b) => copyButton(b, () => b.dataset.copy));
+// the signature moment, after copying the code: only when the stage is on screen, never twice at once
+const cheer = () => {
+  if (state.cheer || reducedMotion() || scrollY > innerHeight * 0.45) return;
+  state.cheer = true; scenes.update();
+  setTimeout(() => { state.cheer = false; scenes.update(); if (state.action === 'scatter') m.scatter(); }, 2400);
+};
+copyButton($('copy-code'), () => code.textContent, code, cheer);
+document.querySelectorAll('[data-copy]').forEach((b) => copyButton(b, () => b.dataset.copy, b.previousElementSibling));
 
 /* ——— Hint and announcements ——— */
 const hint = $('hint'), status = $('status');
