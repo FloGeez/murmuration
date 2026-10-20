@@ -106,6 +106,7 @@ let strokeId = null;
 stage.addEventListener('pointerdown', (e) => {
   // one finger draws: a second one, once the line has started, is ignored
   if (stroke || e.button !== 0 || (e.pointerType === 'touch' && state.action !== 'draw')) return;
+  e.preventDefault(); // no text selection nor native drag, which would cancel the next line
   strokeId = e.pointerId; stroke = [[e.pageX, e.pageY]]; stage.setPointerCapture(e.pointerId); sizeInk(); ink.style.transition = 'none'; ink.style.opacity = 1; dismissHint();
 });
 stage.addEventListener('pointermove', (e) => {
@@ -122,11 +123,12 @@ const endStroke = (e) => {
   const pts = stroke; stroke = null;
   ink.style.transition = 'opacity 1.2s'; ink.style.opacity = 0;
   const length = pts.slice(1).reduce((s, p, i) => s + Math.hypot(p[0] - pts[i][0], p[1] - pts[i][1]), 0);
-  if (length < 40) return; // a click, not a line
+  if (length < 24) return; // a click, not a line
   state.line = pts; state.lines++; choose('draw');
 };
 stage.addEventListener('pointerup', endStroke);
 stage.addEventListener('pointercancel', endStroke);
+stage.addEventListener('lostpointercapture', endStroke);
 
 /* ——— Scenes: the stage, then one per section ——— */
 const sections = [...document.querySelectorAll('.scene')];
@@ -156,13 +158,23 @@ function wirePose() {
   const pts = Array.from({ length: n }, (_, i) => { const t = (i + 0.5) / n, u = 1 - t; return [t * box.width, (u * u * 0.34 + 2 * u * t * 0.58 + t * t * 0.34) * box.height]; });
   return landed(box, pts, { rest: 'circle', zone: () => ({ x: box.left + box.width / 2, y: box.top + box.height * 0.08, rx: box.width * 0.3, ry: 26 }) });
 }
+// the end: a few shy birds perch on the top edge of the install command and of its Copy button; the others leave
+const install = $('install'), end = document.querySelector('.end');
+const onEdges = () => {
+  const box = docBox(install), copy = install.querySelector('button').getBoundingClientRect(), r = install.getBoundingClientRect();
+  const along = (left, width, n) => Array.from({ length: n }, (_, i) => [left + (i + 1) * width / (n + 1), 0]);
+  return landed(box, [...along(18, r.width - copy.width - 40, 5), ...along(copy.left - r.left + 6, copy.width - 12, 2)], { rest: 'leave', shy: true });
+};
 const scenes = createScenes(m, [
   { name: 'stage', active: () => scrollY < innerHeight * 0.45 && (state.cheer || (state.action !== 'fly' && state.action !== 'scatter' && !(state.action === 'draw' && !state.line))), variant: () => [state.cheer ? 'cheer' : state.action, text(), state.lines, rev, state.codeOpen].join('|'), pose: stagePose },
   { name: 'wire', active: () => inView(sections[0]), variant: () => `${rev}|${layout}`, pose: wirePose },
   { name: 'scenes', active: () => inView(sections[1]), variant: () => `${rev}|${layout}`, pose: () => shapeIn(perchOf('scenes'), braces, { rest: 'circle', zone: orbitAbove(docBox(perchOf('scenes'))), keep: 40 }) },
   { name: 'shy', active: () => inView(sections[2]), variant: () => `${rev}|${layout}`, pose: () => shapeIn(perchOf('shy'), ring, { rest: 'leave', shy: true }) },
+  { name: 'end', active: () => end.getBoundingClientRect().top < innerHeight * 0.6, variant: () => `${rev}|${layout}`, pose: onEdges },
 ], { debug: new URLSearchParams(location.search).has('debug') });
 addEventListener('scroll', () => requestAnimationFrame(() => scenes.update()), { passive: true });
+// Copy → Copied changes the button's width: the birds on it step along
+if ('ResizeObserver' in window) new ResizeObserver(() => { if (scenes.scene === 'end') scenes.update(true); }).observe(install);
 let resizing = 0;
 addEventListener('resize', () => { clearTimeout(resizing); resizing = setTimeout(() => { m.setGlyph(glyphNow()); scenes.update(true); }, 200); });
 

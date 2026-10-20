@@ -23,9 +23,9 @@
 
 <main>
   <section class="stage" id="stage" aria-labelledby="title">
-    <h1 class="sr-only" id="title">murmuration, a flock that draws shapes</h1>
+    <h1 class="sr-only" id="title">murmuration: a nuée, a flock that draws shapes</h1>
     <canvas class="ink" id="ink" aria-hidden="true"></canvas>
-    <p class="hint" id="hint">Type to write, drag to draw</p>
+    <p class="hint" id="hint"><i lang="fr">Nuée</i> is French for a flock. Type to write, drag to draw.</p>
     <p class="sr-only" aria-live="polite" id="status"></p>
   </section>
 
@@ -58,14 +58,14 @@
 
   <footer class="end">
     <h2>Plain ES modules, no build, no dependency</h2>
-    <div class="install"><code>npm i @flogeez/murmuration</code><button type="button" class="ghost copy" data-copy="npm i @flogeez/murmuration"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></svg><span>Copy</span></button></div>
+    <div class="install" id="install"><code>npm i @flogeez/murmuration</code><button type="button" class="ghost copy" data-copy="npm i @flogeez/murmuration"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></svg><span>Copy</span></button></div>
     <p><a href="https://github.com/FloGeez/murmuration">Source and docs on GitHub</a>. MIT licence. Made by <a href="https://florian-etourneau.dev">Florian Etourneau</a>.</p>
   </footer>
 </main>
 
 <!-- the toolbar: what the flock writes, what it is made of, how it behaves -->
 <div class="toolbar" role="toolbar" aria-label="Flock">
-  <label class="word"><span class="sr-only">Word</span><input id="word" value="murmuration" maxlength="14" autocomplete="off" spellcheck="false" placeholder="Write a word"></label>
+  <label class="word"><span class="sr-only">Word</span><input id="word" value="nuée" maxlength="14" autocomplete="off" spellcheck="false" placeholder="Write a word"></label>
   <div class="group" id="glyphs" role="radiogroup" aria-label="Glyph"><span class="pill" aria-hidden="true"></span></div>
   <div class="group" id="shapes" role="radiogroup" aria-label="Shape"><span class="pill" aria-hidden="true"></span></div>
   <button class="tool" id="settings-toggle" type="button" aria-expanded="false" aria-controls="settings" aria-label="Settings" data-tip="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg></button>
