@@ -10,6 +10,8 @@
  *   m.fly()          // fly freely in the viewport's margin
  *   m.scatter()      // leave the screen
  *   m.setGlyph(glyph) // change the glyph of the whole flock
+ *   m.setCount(n)    // add or remove birds; perch again to share the places out
+ *   m.destroy()      // stop and remove every listener
  */
 // Flock speeds (1 = the original setting at 60 frames/s):
 // SPEED_PERCH for birds on their way to a place (shapes, wire, path); SPEED_FREE for the circling flock, slower:
@@ -24,7 +26,8 @@ export function createMurmuration(canvas, opts = {}) {
   let glyph, GLYPH, GX, GY, S;
   const useGlyph = (g) => { glyph = g; GLYPH = new Path2D(g.path); [GX, GY] = g.anchor; S = opts.scale || g.scale; };
   useGlyph(opts.glyph || PLAIN_BIRD);
-  const N = opts.count || 170;
+  // every listener goes through this signal, so that destroy() removes them all
+  const life = new AbortController(), signal = life.signal;
   // the view: the viewport scrolled over the page, or the canvas itself
   const inCanvas = opts.frame === 'canvas';
   const viewX = () => (inCanvas ? 0 : scrollX), viewY = () => (inCanvas ? 0 : scrollY);
@@ -36,8 +39,9 @@ export function createMurmuration(canvas, opts = {}) {
     if (reduced) draw();
   };
   const B = [], grid = new Map();
-  for (let k = 0; k < N; k++) B.push({ x: viewX() + vw * (0.2 + Math.random() * 0.6), y: viewY() + vh * Math.random() * 0.5, vx: Math.random() - 0.5, vy: Math.random() - 0.5, t: null, perched: false, away: false, ph: Math.random() * 6.283, c: colors[k % colors.length] });
-  resize(); addEventListener('resize', resize);
+  const bird = (k) => ({ x: viewX() + vw * (0.2 + Math.random() * 0.6), y: viewY() + vh * Math.random() * 0.5, vx: Math.random() - 0.5, vy: Math.random() - 0.5, t: null, perched: false, away: false, ph: Math.random() * 6.283, c: colors[k % colors.length] });
+  for (let k = 0; k < (opts.count || 170); k++) B.push(bird(k));
+  resize(); addEventListener('resize', resize, { signal });
   const sizeWatch = inCanvas && 'ResizeObserver' in window ? new ResizeObserver(resize) : null;
   if (sizeWatch) sizeWatch.observe(canvas);
   // the pointer, in the view's coordinates: recomputed on scroll too (the pointer stays still, the page moves)
@@ -47,9 +51,9 @@ export function createMurmuration(canvas, opts = {}) {
     if (inCanvas) { const r = canvas.getBoundingClientRect(); mx = px0 - r.left; my = py0 - r.top; } else { mx = px0 + scrollX; my = py0 + scrollY; }
     if (shy) dirty = true;
   };
-  addEventListener('pointermove', (e) => { px0 = e.clientX; py0 = e.clientY; track(); }, { passive: true });
-  addEventListener('scroll', track, { passive: true });
-  document.addEventListener('pointerleave', () => { px0 = mx = null; });
+  addEventListener('pointermove', (e) => { px0 = e.clientX; py0 = e.clientY; track(); }, { passive: true, signal });
+  addEventListener('scroll', track, { passive: true, signal });
+  document.addEventListener('pointerleave', () => { px0 = mx = null; }, { signal });
   // shy: perched birds fly off when the pointer comes close, circle above their place, then land on it again
   let shy = false;
   function startle(b, ms) { b.perched = false; const a = Math.atan2(b.y - my, b.x - mx); b.vx = Math.cos(a) * 2.5 + (Math.random() - 0.5); b.vy = -2.5 - Math.random() * 1.5; b.fright = ms + 900 + Math.random() * 500; }
@@ -57,7 +61,7 @@ export function createMurmuration(canvas, opts = {}) {
   function takeOff(b) { b.wait = 0; b.orb = false; b.fright = 0; if (b.perched) { b.vy -= 2 + Math.random() * 1.5; b.vx += (Math.random() - 0.5) * 2; } b.perched = false; b.t = null; }
   // birds that left come back from the side the page comes from: from the top when scrolling up, from the bottom when scrolling down
   let prevScroll = scrollY, goingUp = false;
-  addEventListener('scroll', () => { if (scrollY !== prevScroll) goingUp = scrollY < prevScroll; prevScroll = scrollY; }, { passive: true });
+  addEventListener('scroll', () => { if (scrollY !== prevScroll) goingUp = scrollY < prevScroll; prevScroll = scrollY; }, { passive: true, signal });
   function comeBack(b) {
     if (!b.away) return; b.away = false;
     b.x = viewX() + vw * (0.1 + Math.random() * 0.8);
@@ -90,7 +94,9 @@ export function createMurmuration(canvas, opts = {}) {
     prevAnchor = anchor; prevOrigin = anchor ? anchor() : [0, 0];
     anchor = anc; origin = anc ? anc() : [0, 0];
     B.forEach(takeOff);
-    const tg = [...T].sort((a, c) => a[0] - c[0]);
+    // more places than birds: keep places spread over the whole shape, not only its left part
+    const spread = T.length > B.length ? Array.from({ length: B.length }, (_, j) => T[Math.floor(j * T.length / B.length)]) : [...T];
+    const tg = spread.sort((a, c) => a[0] - c[0]);
     const n = Math.min(tg.length, B.length), taken = new Set();
     // places go first to the birds on screen: birds that left only come back if some are missing
     const present = B.map((b, k) => k).filter((k) => !B[k].away);
@@ -234,7 +240,7 @@ export function createMurmuration(canvas, opts = {}) {
   // at rest (all perched, nothing moves) nothing is recomputed: the flock is only redrawn on scroll or resize
   let idle = false, dirty = true;
   const wake = () => { dirty = true; };
-  addEventListener('scroll', wake, { passive: true }); addEventListener('resize', wake);
+  addEventListener('scroll', wake, { passive: true, signal }); addEventListener('resize', wake, { signal });
   // The step follows real time, not the number of frames: same speed at 60, 120 or 144 Hz.
   // Capped at 3 frames so that a hiccup (throttled tab, garbage collector) does not teleport the flock.
   let prevT = 0;
@@ -243,12 +249,13 @@ export function createMurmuration(canvas, opts = {}) {
     if (running && (!idle || dirty)) { dirty = false; step(dt); idle = B.every((b) => (b.perched && !b.wait) || (b.away && offscreen(b))); }
     raf = requestAnimationFrame(loop);
   };
-  if (reduced) { addEventListener('scroll', () => { if (anchor) { origin = anchor(); B.forEach((b) => { if (b.perched && b.t) { b.x = b.t[0] + origin[0]; b.y = b.t[1] + origin[1]; } }); } draw(); }, { passive: true }); draw(); } else loop();
-  document.addEventListener('visibilitychange', () => { running = !document.hidden; });
+  if (reduced) { addEventListener('scroll', () => { if (anchor) { origin = anchor(); B.forEach((b) => { if (b.perched && b.t) { b.x = b.t[0] + origin[0]; b.y = b.t[1] + origin[1]; } }); } draw(); }, { passive: true, signal }); draw(); } else loop();
+  document.addEventListener('visibilitychange', () => { running = !document.hidden; }, { signal });
   return {
     perch, fly, scatter,
     setColors(c) { idle = false; colors = c; B.forEach((b, k) => { b.c = colors[k % colors.length]; }); if (reduced) draw(); },
     setGlyph(g) { idle = false; useGlyph(g); if (reduced) draw(); },
-    destroy() { cancelAnimationFrame(raf); removeEventListener('resize', resize); if (sizeWatch) sizeWatch.disconnect(); },
+    setCount(n) { idle = false; while (B.length < n) B.push(bird(B.length)); B.length = Math.max(0, n); if (reduced) draw(); },
+    destroy() { cancelAnimationFrame(raf); life.abort(); if (sizeWatch) sizeWatch.disconnect(); },
   };
 }
