@@ -3,11 +3,13 @@
  *   const m = createMurmuration(canvas, { count: 170, colors: ['#2B2A33', '#5E5C6B'], frame: 'page', glyph, debug: false });
  *   frame: 'page' (default) — a fixed canvas over the whole page, the birds in document coordinates;
  *          'canvas' — the flock lives inside the canvas itself (a plate, a slide), in the canvas's own coordinates
- *   glyph: the perched bird, { path: SVG path d, anchor: [x, y] (the point that sits on its place), scale }; a plain bird by default
+ *   glyph: the perched bird, { path: SVG path d, anchor: [x, y] (the point that sits on its place), scale, flight }; a plain bird by default
+ *          flight: 'wings' (default) draws flying birds as flapping wings; 'glyph' draws the glyph itself, turned towards its heading (a fish, a leaf)
  *   m.perch(points, options)  // land on a list of [x, y] points (document coordinates); options: see perch
  *   (choosing the scene, section by section, is the scene engine's job: scenes.js)
  *   m.fly()          // fly freely in the viewport's margin
  *   m.scatter()      // leave the screen
+ *   m.setGlyph(glyph) // change the glyph of the whole flock
  */
 // Flock speeds (1 = the original setting at 60 frames/s):
 // SPEED_PERCH for birds on their way to a place (shapes, wire, path); SPEED_FREE for the circling flock, slower:
@@ -19,8 +21,10 @@ export function createMurmuration(canvas, opts = {}) {
   const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const ctx = canvas.getContext('2d');
   let colors = opts.colors || ['#2B2A33', '#5E5C6B'];
-  const glyph = opts.glyph || PLAIN_BIRD, GLYPH = new Path2D(glyph.path), [GX, GY] = glyph.anchor;
-  const N = opts.count || 170, S = opts.scale || glyph.scale;
+  let glyph, GLYPH, GX, GY, S;
+  const useGlyph = (g) => { glyph = g; GLYPH = new Path2D(g.path); [GX, GY] = g.anchor; S = opts.scale || g.scale; };
+  useGlyph(opts.glyph || PLAIN_BIRD);
+  const N = opts.count || 170;
   // the view: the viewport scrolled over the page, or the canvas itself
   const inCanvas = opts.frame === 'canvas';
   const viewX = () => (inCanvas ? 0 : scrollX), viewY = () => (inCanvas ? 0 : scrollY);
@@ -203,6 +207,8 @@ export function createMurmuration(canvas, opts = {}) {
       if (offscreen(b)) continue;
       if (b.perched) {
         ctx.globalAlpha = 1; ctx.save(); ctx.translate(b.x - GX * S, b.y - GY * S); ctx.scale(S, S); ctx.fillStyle = b.c; ctx.fill(GLYPH); ctx.restore();
+      } else if (!reduced && glyph.flight === 'glyph') {
+        ctx.globalAlpha = b.t ? 0.95 : 0.5; ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(Math.atan2(b.vy, b.vx)); ctx.scale(S, S); ctx.translate(-GX, -GY); ctx.fillStyle = b.c; ctx.fill(GLYPH); ctx.restore();
       } else if (!reduced) {
         ctx.globalAlpha = b.t ? 0.95 : 0.5;
         const w = Math.sin(now * 16 + b.ph) * 2.4; ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(Math.atan2(b.vy, b.vx) * 0.25);
@@ -242,6 +248,7 @@ export function createMurmuration(canvas, opts = {}) {
   return {
     perch, fly, scatter,
     setColors(c) { idle = false; colors = c; B.forEach((b, k) => { b.c = colors[k % colors.length]; }); if (reduced) draw(); },
+    setGlyph(g) { idle = false; useGlyph(g); if (reduced) draw(); },
     destroy() { cancelAnimationFrame(raf); removeEventListener('resize', resize); if (sizeWatch) sizeWatch.disconnect(); },
   };
 }
