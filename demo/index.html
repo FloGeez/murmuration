@@ -4,46 +4,92 @@
 <style>
 :root { --bg: #F6F5F2; --surface: #ECEAE5; --text: #1F1E24; --muted: #5E5C6B; --line: #D6D3CC; --accent: #1F1E24; }
 body { margin: 0; min-height: 100vh; background: var(--bg); color: var(--text); font: 16px/1.5 system-ui, sans-serif; }
-main { display: grid; grid-template-columns: minmax(0, 320px) minmax(0, 640px); gap: 48px; align-items: center; min-height: 100vh; padding: 32px; box-sizing: border-box; max-width: 1100px; margin: 0 auto; }
+main { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 640px); gap: 48px; align-items: center; min-height: 100vh; padding: 32px; box-sizing: border-box; max-width: 1100px; margin: 0 auto; }
 h1 { font-size: 44px; line-height: 1; letter-spacing: -.03em; margin: 0 0 12px; }
 p { color: var(--muted); margin: 0 0 24px; }
 code { font-size: 14px; }
-nav { display: flex; flex-direction: column; gap: 8px; }
-button { font: inherit; font-weight: 600; text-align: left; min-height: 44px; padding: 0 16px; border-radius: 10px; border: 1.5px solid var(--line); background: transparent; color: var(--text); cursor: pointer; }
+h2 { font-size: 13px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); margin: 24px 0 8px; }
+input { box-sizing: border-box; width: 100%; font: inherit; font-size: 20px; font-weight: 700; min-height: 48px; padding: 0 16px; border-radius: 10px; border: 1.5px solid var(--line); background: #fff; color: var(--text); }
+input:focus-visible { outline: 3px solid var(--muted); outline-offset: 3px; }
+nav { display: flex; flex-wrap: wrap; gap: 8px; }
+button { font: inherit; font-weight: 600; min-height: 44px; padding: 0 16px; border-radius: 10px; border: 1.5px solid var(--line); background: transparent; color: var(--text); cursor: pointer; }
 button[aria-pressed=true] { background: #fff; border-color: var(--accent); }
 button:focus-visible { outline: 3px solid var(--muted); outline-offset: 3px; }
 #sky { width: 100%; aspect-ratio: 9 / 8; border-radius: 16px; background: var(--surface); display: block; }
-@media (max-width: 760px) { main { grid-template-columns: 1fr; } }
+@media (max-width: 760px) { main { grid-template-columns: 1fr; gap: 24px; padding: 16px; } #sky { order: -1; } }
 </style></head>
 <body>
 <main>
   <div>
     <h1>murmuration</h1>
-    <p>A flock that draws shapes: a tight outline, a sparse inside. The birds shy away from the pointer. Here the flock lives inside a canvas (<code>frame: 'canvas'</code>); by default it goes along the whole page.</p>
-    <nav id="nav"></nav>
+    <p>A flock that draws shapes: a tight outline, a sparse inside. Perched ones shy away from the pointer. Here the flock lives inside a canvas (<code>frame: 'canvas'</code>); by default it goes along the whole page.</p>
+    <h2><label for="word">Write a word</label></h2>
+    <input id="word" value="hello" maxlength="12" autocomplete="off" spellcheck="false">
+    <h2>Glyph</h2>
+    <nav id="glyphs" aria-label="Glyph"></nav>
+    <h2>Shapes</h2>
+    <nav id="shapes" aria-label="Shapes"></nav>
   </div>
-  <canvas id="sky" aria-label="A flock of birds drawing the chosen shape"></canvas>
+  <canvas id="sky" aria-label="A flock drawing the chosen word or shape"></canvas>
 </main>
 <!-- Open through a small local server (npx serve . at the repository root): ES modules do not load over file:// -->
 <script type="module">
-import { createMurmuration, sampleShape, fitShape, solid, hollow } from '../index.js';
+import { createMurmuration, PLAIN_BIRD, sampleShape, fitShape, solid, hollow } from '../index.js';
 
 // three plain shapes on the 720 × 640 frame
 const ring = (g) => { solid(g); g.beginPath(); g.arc(360, 320, 260, 0, 6.2832); g.fill(); hollow(g); g.beginPath(); g.arc(360, 320, 150, 0, 6.2832); g.fill(); solid(g); };
 const heart = (g) => { solid(g); g.beginPath(); g.moveTo(360, 580); g.bezierCurveTo(120, 420, 70, 250, 160, 150); g.bezierCurveTo(240, 70, 330, 110, 360, 190); g.bezierCurveTo(390, 110, 480, 70, 560, 150); g.bezierCurveTo(650, 250, 600, 420, 360, 580); g.fill(); };
 const star = (g) => { solid(g); g.beginPath(); for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, r = i % 2 ? 120 : 290; g.lineTo(360 + Math.cos(a) * r, 330 + Math.sin(a) * r); } g.closePath(); g.fill(); hollow(g); g.beginPath(); g.arc(360, 330, 60, 0, 6.2832); g.fill(); solid(g); };
 
+// the typed word: one shape, its cache key is the text, as large as the frame allows
+const input = document.getElementById('word');
+const text = () => input.value.trim();
+const word = (g) => {
+  const font = (size) => `900 ${size}px system-ui, sans-serif`;
+  g.font = font(100); const size = Math.min(380, 100 * 600 / g.measureText(text()).width);
+  g.font = font(size); g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(text(), 360, 330);
+};
+word.key = text;
+
+// the glyphs: an SVG path facing right, the point that sits on its place, its scale; the fish and the leaf travel as themselves
+const glyphs = [
+  ['Bird', PLAIN_BIRD, ['#2B2A33', '#2B2A33', '#5E5C6B']],
+  ['Fish', { path: 'M86 30 C76 16 54 12 36 22 L14 10 L20 30 L14 50 L36 38 C54 48 76 44 86 30 Z', anchor: [50, 30], scale: 0.16, flight: 'glyph' }, ['#164A6E', '#1F5E8C', '#2E7FB5']],
+  ['Firefly', { path: 'M10 0 A10 10 0 1 1 10 20 A10 10 0 1 1 10 0 Z', anchor: [10, 10], scale: 0.3, flight: 'glyph' }, ['#B97A06', '#D99512', '#8A5A00']],
+  ['Leaf', { path: 'M4 30 C24 8 62 4 92 30 C62 56 24 52 4 30 Z', anchor: [48, 30], scale: 0.15, flight: 'glyph' }, ['#3F7A3A', '#5E8F2E', '#A8692A']],
+];
+
 const sky = document.getElementById('sky');
-const m = createMurmuration(sky, { frame: 'canvas', count: 320, colors: ['#2B2A33', '#2B2A33', '#5E5C6B'], debug: new URLSearchParams(location.search).has('debug') });
+const m = createMurmuration(sky, { frame: 'canvas', count: 320, colors: glyphs[0][2], debug: new URLSearchParams(location.search).has('debug') });
 const size = () => ({ width: sky.clientWidth, height: sky.clientHeight });
 const swarm = () => ({ x: sky.clientWidth / 2, y: 40, rx: sky.clientWidth * 0.3, ry: 20 });
-const land = (shape) => m.perch(fitShape(sampleShape(shape, 288), size()), { rest: 'circle', zone: swarm });
-const actions = [['Free flight', () => m.fly()], ['Ring', () => land(ring)], ['Heart', () => land(heart)], ['Star', () => land(star)], ['Shy ring', () => m.perch(fitShape(sampleShape(ring, 288), size()), { rest: 'leave', shy: true })], ['Scatter', () => m.scatter()]];
-const nav = document.getElementById('nav');
-actions.forEach(([label, run], i) => {
-  const b = document.createElement('button'); b.type = 'button'; b.textContent = label; b.setAttribute('aria-pressed', i === 0);
-  b.onclick = () => { nav.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', x === b)); run(); };
-  nav.append(b);
-});
+// fewer places on a small sky, so that the glyphs do not overlap
+const places = () => Math.round(Math.min(288, sky.clientWidth * 0.45));
+const land = (shape) => m.perch(fitShape(sampleShape(shape, places()), size()), { rest: 'circle', zone: swarm, keep: 48, shy: true });
+
+// a group of buttons where one is pressed; select(null) releases them all
+const group = (nav, items, run) => {
+  const buttons = items.map(([label, ...rest], i) => {
+    const b = document.createElement('button'); b.type = 'button'; b.textContent = label;
+    b.onclick = () => { select(i); run(...rest); };
+    nav.append(b); return b;
+  });
+  const select = (i) => buttons.forEach((b, k) => b.setAttribute('aria-pressed', k === i));
+  return select;
+};
+
+const selectGlyph = group(document.getElementById('glyphs'), glyphs, (glyph, colors) => { m.setGlyph(glyph); m.setColors(colors); });
+selectGlyph(0);
+
+const selectShape = group(document.getElementById('shapes'), [
+  ['Free flight', () => m.fly()], ['Ring', () => land(ring)], ['Heart', () => land(heart)], ['Star', () => land(star)], ['Scatter', () => m.scatter()],
+], (run) => run());
+
+// typing re-lands the flock on the word, once the hand pauses; an empty field lets it fly
+let pause = 0;
+const writeWord = () => { selectShape(null); if (text()) land(word); else m.fly(); };
+input.addEventListener('input', () => { clearTimeout(pause); pause = setTimeout(writeWord, 300); });
+input.addEventListener('focus', () => { if (text()) writeWord(); });
+writeWord();
 </script>
 </body></html>

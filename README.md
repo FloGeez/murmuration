@@ -2,7 +2,7 @@
 
 A flock of birds that draws shapes. The birds land on a list of points, settle tight on a shape's outline and sparse inside it, circle a zone above it, shy away from the pointer, and follow the page section by section. One canvas, plain ES modules, no build, no dependency.
 
-It is the engine behind the starlings of [florian-etourneau.dev](https://florian-etourneau.dev).
+It is the engine behind the starlings of [florian-etourneau.dev](https://florian-etourneau.dev). Birds are only the default: give it a fish, a leaf or a dot and it becomes a school, a gust or a swarm of fireflies. **[Try the demo](https://flogeez.github.io/murmuration/demo/)**: type a word, change the glyph.
 
 ```sh
 npm i @flogeez/murmuration
@@ -21,7 +21,7 @@ m.perch(fitShape(sampleShape(ring, 288), { width: canvas.clientWidth, height: ca
 });
 ```
 
-`m.fly()` lets the flock fly freely, `m.scatter()` sends it away, `m.destroy()` cleans up.
+`m.fly()` lets the flock fly freely, `m.scatter()` sends it away, `m.setColors(colors)` and `m.setGlyph(glyph)` restyle it, `m.destroy()` cleans up.
 
 ## Options
 
@@ -32,7 +32,7 @@ m.perch(fitShape(sampleShape(ring, 288), { width: canvas.clientWidth, height: ca
 | `frame` | `'page'` | `'page'`: a fixed canvas over the whole page, the birds in document coordinates. `'canvas'`: the flock lives inside the canvas, in its own coordinates, with soft walls |
 | `count` | `170` | How many birds |
 | `colors` | two greys | The birds' colours, in turn |
-| `glyph` | `PLAIN_BIRD` | The perched bird: `{ path, anchor, scale }`, an SVG path, the point that sits on its place, and its scale |
+| `glyph` | `PLAIN_BIRD` | The perched bird: `{ path, anchor, scale, flight }`, an SVG path facing right, the point that sits on its place, its scale, and how it travels: `'wings'` (default, flapping wings) or `'glyph'` (the glyph itself, turned towards its heading) |
 | `scale` | the glyph's | Overrides the glyph's scale |
 | `debug` | `false` | Shows the places, the swarm's zone and the current scene |
 
