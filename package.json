@@ -1,8 +1,15 @@
 {
   "name": "@flogeez/murmuration",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A flock of birds that draws shapes on a canvas: lands on points, circles a zone, shies away from the pointer, follows the page section by section. Plain ES modules, no build, no dependency.",
-  "keywords": ["murmuration", "flock", "boids", "canvas", "animation", "starlings"],
+  "keywords": [
+    "murmuration",
+    "flock",
+    "boids",
+    "canvas",
+    "animation",
+    "starlings"
+  ],
   "author": "Florian Etourneau",
   "license": "MIT",
   "repository": {
