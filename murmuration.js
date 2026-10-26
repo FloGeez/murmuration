@@ -62,7 +62,8 @@ export function createMurmuration(canvas, opts = {}) {
   let px0 = null, py0 = null;
   const track = () => {
     if (px0 == null) return;
-    if (inCanvas) { const r = canvas.getBoundingClientRect(); mx = px0 - r.left; my = py0 - r.top; } else { mx = px0 + scrollX; my = py0 + scrollY; }
+    // in a canvas shown smaller or larger than its own size (CSS zoom, a transform), the pointer is brought back to the canvas's units
+    if (inCanvas) { const r = canvas.getBoundingClientRect(); mx = (px0 - r.left) * (r.width ? vw / r.width : 1); my = (py0 - r.top) * (r.height ? vh / r.height : 1); } else { mx = px0 + scrollX; my = py0 + scrollY; }
     if (shy) dirty = true;
   };
   addEventListener('pointermove', (e) => { px0 = e.clientX; py0 = e.clientY; track(); }, { passive: true, signal });
