@@ -246,6 +246,8 @@ export function createMurmuration(canvas, opts = {}) {
   let prevT = 0;
   const loop = (t) => {
     const dt = prevT ? Math.min(3, (t - prevT) / (1000 / 60)) : 1; prevT = t;
+    // at rest, a shape whose anchor moves on its own (an animated element, a timeline) still follows it
+    if (running && idle && !dirty && anchor) { const o = anchor(); dirty = o[0] !== origin[0] || o[1] !== origin[1]; }
     if (running && (!idle || dirty)) { dirty = false; step(dt); idle = B.every((b) => (b.perched && !b.wait) || (b.away && offscreen(b))); }
     raf = requestAnimationFrame(loop);
   };
