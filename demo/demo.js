@@ -133,8 +133,10 @@ stage.addEventListener('lostpointercapture', endStroke);
 
 /* ——— Scenes: the stage, then one per section ——— */
 const sections = [...document.querySelectorAll('.scene')];
-// a section is on screen when its middle is in the middle half of the viewport
-const inView = (el) => { const r = el.getBoundingClientRect(), c = (r.top + r.bottom) / 2; return c > innerHeight * 0.2 && c < innerHeight * 0.8; };
+// the section on screen is the one whose middle is nearest the middle of the viewport: there is always one,
+// so the flock goes from one shape to the next without flying off in between
+const offCentre = (el) => { const r = el.getBoundingClientRect(); return Math.abs((r.top + r.bottom) / 2 - innerHeight / 2); };
+const inView = (el) => [stage, ...sections, end].every((s) => offCentre(el) <= offCentre(s));
 const perchOf = (name) => document.querySelector(`[data-scene="${name}"] [data-perch]`);
 const landed = (box, pts, options) => ({ points: pts, anchor: () => [box.left, box.top], ...options });
 const shapeIn = (el, draw, options) => { const box = docBox(el); return landed(box, fitShape(sampleShape(draw, places(box)), box), options); };
@@ -167,13 +169,18 @@ const onEdges = () => {
   return landed(box, [...along(18, r.width - copy.width - 40, 5), ...along(copy.left - r.left + 6, copy.width - 12, 2)], { rest: 'leave', shy: true });
 };
 const scenes = createScenes(m, [
-  { name: 'stage', active: () => scrollY < innerHeight * 0.45 && (state.cheer || (state.action !== 'fly' && state.action !== 'scatter' && !(state.action === 'draw' && !state.line))), variant: () => [state.cheer ? 'cheer' : state.action, text(), state.lines, rev, state.codeOpen].join('|'), pose: stagePose },
+  { name: 'stage', active: () => inView(stage) && (state.cheer || (state.action !== 'fly' && state.action !== 'scatter' && !(state.action === 'draw' && !state.line))), variant: () => [state.cheer ? 'cheer' : state.action, text(), state.lines, rev, state.codeOpen].join('|'), pose: stagePose },
   { name: 'wire', active: () => inView(sections[0]), variant: () => `${rev}|${layout}`, pose: wirePose },
   { name: 'scenes', active: () => inView(sections[1]), variant: () => `${rev}|${layout}`, pose: () => shapeIn(perchOf('scenes'), braces, { rest: 'circle', zone: orbitAbove(docBox(perchOf('scenes'))), keep: 40 }) },
   { name: 'shy', active: () => inView(sections[2]), variant: () => `${rev}|${layout}`, pose: () => shapeIn(perchOf('shy'), ring, { rest: 'leave', shy: true }) },
-  { name: 'end', active: () => end.getBoundingClientRect().top < innerHeight * 0.6, variant: () => `${rev}|${layout}`, pose: onEdges },
+  { name: 'end', active: () => inView(end), variant: () => `${rev}|${layout}`, pose: onEdges },
 ], { debug: new URLSearchParams(location.search).has('debug') });
-addEventListener('scroll', () => requestAnimationFrame(() => scenes.update()), { passive: true });
+// on scroll, once per frame
+let scrolled = false;
+addEventListener('scroll', () => { if (!scrolled) { scrolled = true; requestAnimationFrame(() => { scrolled = false; scenes.update(); }); } }, { passive: true });
+// the shapes below the stage are sampled while the page is idle, so that the flock leaves for them without a hitch
+const idle = window.requestIdleCallback || ((f) => setTimeout(f, 200));
+const warmUp = () => [['scenes', braces], ['shy', ring]].forEach(([name, draw], i) => idle(() => sampleShape(draw, places(docBox(perchOf(name)))), { timeout: 2000 + i * 300 }));
 // Copy → Copied changes the button's width: the birds on it step along
 if ('ResizeObserver' in window) new ResizeObserver(() => { if (scenes.scene === 'end') scenes.update(true); }).observe(install);
 let resizing = 0;
@@ -380,5 +387,5 @@ pickGlyph(0); pickShape(null);
 scenes.update(); // the first scene lands at once: let it be free flight, so that the title is written in flight
 showCode();
 Promise.race([document.fonts.load('800 100px Archivo'), new Promise((r) => setTimeout(r, 1500))]).then(() => {
-  state.action = 'word'; scenes.update(); showCode(); before = {};
+  state.action = 'word'; scenes.update(); showCode(); before = {}; warmUp();
 });
