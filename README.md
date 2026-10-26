@@ -76,6 +76,7 @@ onUnmounted(() => m.destroy());
 | `anchor` | Function returning the origin `[x, y]` of the points: the shape follows a moving element |
 | `shy` | Perched birds fly off when the pointer comes close, then land again |
 | `instant` | Land at once |
+| `centred` | Each bird's middle sits on its point, rather than its feet (the glyph's `anchor`): for a flock that fills a shape drawn underneath, exactly |
 
 `prefers-reduced-motion` is honoured: the birds are placed without moving.
 

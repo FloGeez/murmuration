@@ -26,12 +26,26 @@ export function createMurmuration(canvas, opts = {}) {
   let glyph, GLYPH, GX, GY, S;
   const useGlyph = (g) => { glyph = g; GLYPH = new Path2D(g.path); [GX, GY] = g.anchor; S = opts.scale || g.scale; };
   useGlyph(opts.glyph || PLAIN_BIRD);
+  // centred: the middle of the glyph, not its anchor, goes on the place. The middle is measured once per glyph by the browser.
+  const middles = new WeakMap();
+  const middleOf = (g) => {
+    if (!middles.has(g)) {
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg'), p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      svg.setAttribute('style', 'position:absolute;width:0;height:0;overflow:hidden;visibility:hidden'); p.setAttribute('d', g.path);
+      svg.append(p); document.body.append(svg); const b = p.getBBox(); svg.remove();
+      middles.set(g, [b.x + b.width / 2, b.y + b.height / 2]);
+    }
+    return middles.get(g);
+  };
+  const liftFor = () => { if (!centred) return [0, 0]; const [cx, cy] = middleOf(glyph); return [(GX - cx) * S, (GY - cy) * S]; };
+  // where the points of a perch sit: their anchor's origin, moved by the lift that centres each bird on its place
+  const at = (a = anchor, l = lift) => { const o = a ? a() : [0, 0]; return [o[0] + l[0], o[1] + l[1]]; };
   // every listener goes through this signal, so that destroy() removes them all
   const life = new AbortController(), signal = life.signal;
   // the view: the viewport scrolled over the page, or the canvas itself
   const inCanvas = opts.frame === 'canvas';
   const viewX = () => (inCanvas ? 0 : scrollX), viewY = () => (inCanvas ? 0 : scrollY);
-  let zoneFn = null, Z = null, anchor = null, origin = [0, 0], prevAnchor = null, prevOrigin = [0, 0], waitEnd = 0, vw = inCanvas ? canvas.clientWidth : innerWidth, vh = inCanvas ? canvas.clientHeight : innerHeight, dpr = 1, raf = 0, mx = null, my = null, running = true;
+  let zoneFn = null, Z = null, anchor = null, origin = [0, 0], prevAnchor = null, prevOrigin = [0, 0], lift = [0, 0], centred = false, waitEnd = 0, vw = inCanvas ? canvas.clientWidth : innerWidth, vh = inCanvas ? canvas.clientHeight : innerHeight, dpr = 1, raf = 0, mx = null, my = null, running = true;
   const resize = () => {
     dpr = Math.min(2, window.devicePixelRatio || 1);
     if (inCanvas) { vw = canvas.clientWidth; vh = canvas.clientHeight; } else { vw = innerWidth; vh = innerHeight; canvas.style.width = vw + 'px'; canvas.style.height = vh + 'px'; }
@@ -86,13 +100,15 @@ export function createMurmuration(canvas, opts = {}) {
   //         or a path {path: [[x, y], …]} (document) along which they go back and forth
   //   keep: with 'circle', how many birds without a place circle; the others leave (all of them circle by default)
   //   shy: perched birds fly off when the pointer comes close (see startle)
-  function perch(T, { instant = false, rest = 'fly', anchor: anc = null, zone = null, keep = Infinity, shy: isShy = false } = {}) {
+  //   centred: each bird's middle sits on its point, not its feet (the glyph's anchor): to fill a shape exactly
+  function perch(T, { instant = false, rest = 'fly', anchor: anc = null, zone = null, keep = Infinity, shy: isShy = false, centred: isCentred = false } = {}) {
     idle = false; shy = isShy;
     zoneFn = rest === 'circle' ? zone : null;
     // the flock re-forms: perched birds fly off one after the other, from left to right
     const now = performance.now(), before = B.map((b) => (b.perched && b.t && !reduced && !instant ? b.t : null));
-    prevAnchor = anchor; prevOrigin = anchor ? anchor() : [0, 0];
-    anchor = anc; origin = anc ? anc() : [0, 0];
+    const oldAnchor = anchor, oldLift = lift;
+    prevAnchor = oldAnchor ? () => at(oldAnchor, oldLift) : null; prevOrigin = at(oldAnchor, oldLift);
+    anchor = anc; centred = isCentred; lift = liftFor(); origin = at();
     B.forEach(takeOff);
     // more places than birds: keep places spread over the whole shape, not only its left part
     const spread = T.length > B.length ? Array.from({ length: B.length }, (_, j) => T[Math.floor(j * T.length / B.length)]) : [...T];
@@ -116,10 +132,10 @@ export function createMurmuration(canvas, opts = {}) {
     waitEnd = now + 700;
     if (reduced || instant) { B.forEach((b) => { if (b.t) { b.x = b.t[0] + origin[0]; b.y = b.t[1] + origin[1]; b.perched = true; } }); draw(); }
   }
-  function fly() { idle = false; shy = false; anchor = null; zoneFn = null; B.forEach((b) => { takeOff(b); comeBack(b); }); if (reduced) draw(); }
+  function fly() { idle = false; shy = false; anchor = null; centred = false; lift = [0, 0]; zoneFn = null; B.forEach((b) => { takeOff(b); comeBack(b); }); if (reduced) draw(); }
   function scatter() {
     idle = false; shy = false;
-    anchor = null; zoneFn = null;
+    anchor = null; centred = false; lift = [0, 0]; zoneFn = null;
     B.forEach((b) => { takeOff(b); leave(b); });
     if (reduced) draw();
   }
@@ -130,7 +146,7 @@ export function createMurmuration(canvas, opts = {}) {
     // free-flight zone: on a page, the right margin of the viewport, a little above the middle; in a canvas, around its centre
     const ax = inCanvas ? vw / 2 + Math.cos(now * 0.33) * vw * 0.2 : scrollX + vw * (vw > 900 ? 0.86 : 0.66) + Math.cos(now * 0.33) * vw * 0.1;
     const ay = inCanvas ? vh / 2 + Math.sin(now * 0.51) * vh * 0.1 : scrollY + vh * 0.3 + Math.sin(now * 0.51) * vh * 0.15;
-    origin = anchor ? anchor() : [0, 0];
+    origin = at();
     Z = zoneFn ? zoneFn() : null;
     if (Z && Z.path) Z.point = alongPath(Z.path, now);
     const ms = performance.now(); if (prevAnchor && ms < waitEnd) prevOrigin = prevAnchor();
@@ -247,16 +263,16 @@ export function createMurmuration(canvas, opts = {}) {
   const loop = (t) => {
     const dt = prevT ? Math.min(3, (t - prevT) / (1000 / 60)) : 1; prevT = t;
     // at rest, a shape whose anchor moves on its own (an animated element, a timeline) still follows it
-    if (running && idle && !dirty && anchor) { const o = anchor(); dirty = o[0] !== origin[0] || o[1] !== origin[1]; }
+    if (running && idle && !dirty && anchor) { const o = at(); dirty = o[0] !== origin[0] || o[1] !== origin[1]; }
     if (running && (!idle || dirty)) { dirty = false; step(dt); idle = B.every((b) => (b.perched && !b.wait) || (b.away && offscreen(b))); }
     raf = requestAnimationFrame(loop);
   };
-  if (reduced) { addEventListener('scroll', () => { if (anchor) { origin = anchor(); B.forEach((b) => { if (b.perched && b.t) { b.x = b.t[0] + origin[0]; b.y = b.t[1] + origin[1]; } }); } draw(); }, { passive: true, signal }); draw(); } else loop();
+  if (reduced) { addEventListener('scroll', () => { if (anchor) { origin = at(); B.forEach((b) => { if (b.perched && b.t) { b.x = b.t[0] + origin[0]; b.y = b.t[1] + origin[1]; } }); } draw(); }, { passive: true, signal }); draw(); } else loop();
   document.addEventListener('visibilitychange', () => { running = !document.hidden; }, { signal });
   return {
     perch, fly, scatter,
     setColors(c) { idle = false; colors = c; B.forEach((b, k) => { b.c = colors[k % colors.length]; }); if (reduced) draw(); },
-    setGlyph(g) { idle = false; useGlyph(g); if (reduced) draw(); },
+    setGlyph(g) { idle = false; useGlyph(g); lift = liftFor(); if (reduced) draw(); },
     setCount(n) { idle = false; while (B.length < n) B.push(bird(B.length)); B.length = Math.max(0, n); if (reduced) draw(); },
     destroy() { cancelAnimationFrame(raf); life.abort(); if (sizeWatch) sizeWatch.disconnect(); },
   };
